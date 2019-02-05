@@ -29,7 +29,7 @@ sub loadDatas{
 
     my $query = "select COALESCE(allitems.datereceived, '0000-00-00') as datetime, IFNULL(allitems.price, '0.00') as amount, allitems.itemnumber, ";
     $query .= 'allitems.homebranch as branch, allitems.location, ';
-    $query .= 'allitems.dateaccessioned as acquired_year, allitems.biblioitemnumber, allitems.ccode as collection_code, ';
+    $query .= 'allitems.datereceived as acquired_year, allitems.biblioitemnumber, allitems.ccode as collection_code, ';
     $query .= 'allitems.itype as itemtype, allbmeta.metadata as marcxml, allbitems.publicationyear as published_year ';
     $query .= 'from items as allitems ';
     $query .= 'inner join biblioitems as allbitems on allitems.biblioitemnumber=allbitems.biblioitemnumber ';
@@ -39,7 +39,7 @@ sub loadDatas{
 
     my $query2 = "UNION ALL select COALESCE(allitems.datereceived, '0000-00-00') as datetime, IFNULL(allitems.price, '0.00') as amount, allitems.itemnumber, ";
     $query2 .= 'allitems.homebranch as branch, allitems.location, ';
-    $query2 .= 'allitems.dateaccessioned as acquired_year, allitems.biblioitemnumber, allitems.ccode as collection_code, ';
+    $query2 .= 'allitems.datereceived as acquired_year, allitems.biblioitemnumber, allitems.ccode as collection_code, ';
     $query2 .= 'allitems.itype as itemtype, allbmeta.metadata as marcxml, allbitems.publicationyear as published_year ';
     $query2 .= 'from deleteditems as allitems ';
     $query2 .= 'inner join biblioitems as allbitems on allitems.biblioitemnumber=allbitems.biblioitemnumber ';
@@ -49,7 +49,7 @@ sub loadDatas{
 
     my $query3 = "UNION ALL select COALESCE(allitems.datereceived, '0000-00-00') as datetime, IFNULL(allitems.price, '0.00') as amount, allitems.itemnumber, ";
     $query3 .= 'allitems.homebranch as branch, allitems.location, ';
-    $query3 .= 'allitems.dateaccessioned as acquired_year, allitems.biblioitemnumber, allitems.ccode as collection_code, ';
+    $query3 .= 'allitems.datereceived as acquired_year, allitems.biblioitemnumber, allitems.ccode as collection_code, ';
     $query3 .= 'allitems.itype as itemtype, allbmeta.metadata as marcxml, allbitems.publicationyear as published_year ';
     $query3 .= 'from items as allitems ';
     $query3 .= 'inner join deletedbiblioitems as allbitems on allitems.biblioitemnumber=allbitems.biblioitemnumber ';
@@ -59,7 +59,7 @@ sub loadDatas{
 
     my $query4 = "UNION ALL select COALESCE(allitems.datereceived, '0000-00-00') as datetime, IFNULL(allitems.price, '0.00') as amount, allitems.itemnumber, ";
     $query4 .= 'allitems.homebranch as branch, allitems.location, ';
-    $query4 .= 'allitems.dateaccessioned as acquired_year, allitems.biblioitemnumber, allitems.ccode as collection_code, ';
+    $query4 .= 'allitems.datereceived as acquired_year, allitems.biblioitemnumber, allitems.ccode as collection_code, ';
     $query4 .= 'allitems.itype as itemtype, allbmeta.metadata as marcxml, allbitems.publicationyear as published_year ';
     $query4 .= 'from deleteditems as allitems ';
     $query4 .= 'inner join deletedbiblioitems as allbitems on allitems.biblioitemnumber=allbitems.biblioitemnumber ';
