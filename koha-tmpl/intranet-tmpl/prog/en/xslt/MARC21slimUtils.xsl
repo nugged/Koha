@@ -480,7 +480,7 @@
 	<span class="results_summary performance-medium">
 	  <span class="label">Performance medium: </span>
 	  <span class="datablock">
-	    <xsl:for-each select="//marc:datafield[@tag=382]">
+	    <xsl:for-each select="marc:datafield[@tag=382]">
 	      <span><xsl:attribute name="class">ind1-<xsl:value-of select="@ind1"/></xsl:attribute>
 	      <xsl:for-each select="marc:subfield[@code = 'a' or @code='b' or @code='n']">
 		<xsl:choose>
@@ -549,7 +549,7 @@
 	    <xsl:value-of select="."/>
             <xsl:choose><xsl:when test="position()!=last()"><xsl:text>, </xsl:text></xsl:when></xsl:choose>
 	  </xsl:for-each>
-          <xsl:choose><xsl:when test="position()=last()"><xsl:text>.</xsl:text></xsl:when></xsl:choose>
+          <xsl:choose><xsl:when test="position()=last()"><xsl:text>.</xsl:text></xsl:when><xsl:otherwise><xsl:text>; </xsl:text></xsl:otherwise></xsl:choose>
 	</xsl:for-each>
 	</span>
       </xsl:if>
