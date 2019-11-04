@@ -75,14 +75,23 @@ sub set_item_default_location {
     my $itemnumber = shift;
     my $item = shift || GetItem($itemnumber);
 
-    if ( C4::Context->preference('NewItemsDefaultLocation') ) {
+    my $prev_location      = $item->{'location'};
+    my $prev_perm_location = $item->{'permanent_location'};
+
+    if( my $new_def_location = C4::Context->preference('NewItemsDefaultLocation') ) {
         $item->{'permanent_location'} = $item->{'location'};
-        $item->{'location'} = C4::Context->preference('NewItemsDefaultLocation');
-        ModItem( $item, undef, $itemnumber);
+        $item->{'location'} = $new_def_location;
     }
     else {
-      $item->{'permanent_location'} = $item->{'location'} if !defined($item->{'permanent_location'});
-      ModItem( $item, undef, $itemnumber);
+        $item->{'permanent_location'} = $item->{'location'}
+            if ! defined $item->{'permanent_location'};
+    }
+
+    # we call ModItem only if any of the locations changed, to speed up adding of thousands of items:
+    if(    $prev_location ne $item->{'location'}
+        or $prev_perm_location ne $item->{'permanent_location'} )
+    {
+        ModItem( $item, undef, $itemnumber );
     }
 }
 
