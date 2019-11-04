@@ -225,7 +225,7 @@ sub ShelfToCart {
 =head2 AddItemFromMarc
 
   my ($biblionumber, $biblioitemnumber, $itemnumber) 
-      = AddItemFromMarc($source_item_marc, $biblionumber);
+      = AddItemFromMarc($source_item_marc, $biblionumber[, $dbh]);
 
 Given a MARC::Record object containing an embedded item
 record and a biblionumber, create a new item record.
@@ -233,8 +233,9 @@ record and a biblionumber, create a new item record.
 =cut
 
 sub AddItemFromMarc {
-    my ( $source_item_marc, $biblionumber ) = @_;
-    my $dbh = C4::Context->dbh;
+    my $source_item_marc        = shift;
+    my $biblionumber            = shift;
+    my $dbh                     = @_ ? shift : C4::Context->dbh;
 
     # parse item hash from MARC
     my $frameworkcode = GetFrameworkCode( $biblionumber );

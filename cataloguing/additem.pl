@@ -517,7 +517,7 @@ if ($op eq "additem") {
 
         # if barcode exists, don't create, but report The problem.
         unless ($exist_itemnumber) {
-            my ( $oldbiblionumber, $oldbibnum, $oldbibitemnum ) = AddItemFromMarc( $record, $biblionumber );
+            my ( $oldbiblionumber, $oldbibnum, $oldbibitemnum ) = AddItemFromMarc( $record, $biblionumber, $dbh );
             set_item_default_location($oldbibitemnum);
             my $err = C4::Biblio::UpdateDatereceived($biblionumber);
             push @errors, $err if $err;
@@ -659,7 +659,7 @@ if ($op eq "additem") {
 
                 # Adding the item
                 if (!$exist_itemnumber) {
-                    my ($oldbiblionumber,$oldbibnum,$oldbibitemnum) = AddItemFromMarc($record,$biblionumber);
+                    my ($oldbiblionumber,$oldbibnum,$oldbibitemnum) = AddItemFromMarc( $record, $biblionumber, $dbh );
                     set_item_default_location($oldbibitemnum);
 
                     if ($addToPrintLabelsList) {
