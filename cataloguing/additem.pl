@@ -465,6 +465,8 @@ if ($prefillitem) {
     }
 }
 
+my $num_items_added = 0 ;
+
 #
 # Returns a hash-ref to 4 commonly used fields - undefined hash-values
 # are also needed for use (as a check) in the template for this view.
@@ -563,7 +565,7 @@ if ($op eq "additem") {
 
                 $cookie = [ $cookie, $itemcookie ];
             }
-
+            $num_items_added++;
         }
         $nextop = "additem";
         if ($exist_itemnumber) {
@@ -696,6 +698,8 @@ if ($op eq "additem") {
 
                 # Preparing the next iteration
                 $oldbarcode = $barcodevalue;
+
+                $num_items_added++;
             }
 
             ModZebra( $biblionumber, "specialUpdate", "biblioserver" );
@@ -964,30 +968,35 @@ my ($holdingbrtagf,$holdingbrtagsubf) = &GetMarcFromKohaField("items.holdingbran
 # First, the existing items for display
 my @item_value_loop;
 my @header_value_loop;
-for my $row ( @big_array ) {
-    my %row_data;
-    my @item_fields = map +{ field => $_ || '' }, @$row{ sort keys(%witness) };
-    $row_data{item_value} = [ @item_fields ];
-    $row_data{itemnumber} = $row->{itemnumber};
-    #reporting this_row values
-    $row_data{'nomod'} = $row->{'nomod'};
-    $row_data{'hostitemflag'} = $row->{'hostitemflag'};
-    $row_data{'hostbiblionumber'} = $row->{'hostbiblionumber'};
-#	$row_data{'countanalytics'} = $row->{'countanalytics'};
-    push(@item_value_loop,\%row_data);
-}
-foreach my $subfield_code (sort keys(%witness)) {
-    my %header_value;
-    $header_value{header_value} = $witness{$subfield_code};
 
-    my $subfieldlib = $tagslib->{$itemtagfield}->{$subfield_code};
-    my $kohafield = $subfieldlib->{kohafield};
-    if ( $kohafield && $kohafield =~ /items.(.+)/ ) {
-        $header_value{column_name} = $1;
+# do this only if we didn't just saved POST-form with items:
+if( ! $num_items_added ) {
+    for my $row (@big_array) {
+        my %row_data;
+        my @item_fields = map +{ field => $_ || '' }, @$row{ sort keys(%witness) };
+        $row_data{item_value} = [@item_fields];
+        $row_data{itemnumber} = $row->{itemnumber};
+        #reporting this_row values
+        $row_data{'nomod'}            = $row->{'nomod'};
+        $row_data{'hostitemflag'}     = $row->{'hostitemflag'};
+        $row_data{'hostbiblionumber'} = $row->{'hostbiblionumber'};
+        #   $row_data{'countanalytics'} = $row->{'countanalytics'};
+        push( @item_value_loop, \%row_data );
     }
+    foreach my $subfield_code ( sort keys(%witness) ) {
+        my %header_value;
+        $header_value{header_value} = $witness{$subfield_code};
 
-    push(@header_value_loop, \%header_value);
+        my $subfieldlib = $tagslib->{$itemtagfield}->{$subfield_code};
+        my $kohafield   = $subfieldlib->{kohafield};
+        if( $kohafield && $kohafield =~ /items.(.+)/ ) {
+            $header_value{column_name} = $1;
+        }
+
+        push( @header_value_loop, \%header_value );
+    }
 }
+
 
 # now, build the item form for entering a new item
 my @loop_data =();
@@ -1059,6 +1068,7 @@ $template->param(
     biblionumber => $biblionumber,
     title        => $oldrecord->{title},
     author       => $oldrecord->{author},
+    num_items_added  => $num_items_added,
     item_loop        => \@item_value_loop,
     item_header_loop => \@header_value_loop,
     item             => \@loop_data,
