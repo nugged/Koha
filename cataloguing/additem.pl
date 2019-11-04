@@ -73,7 +73,8 @@ sub get_item_from_barcode {
 
 sub set_item_default_location {
     my $itemnumber = shift;
-    my $item = GetItem( $itemnumber );
+    my $item = shift || GetItem($itemnumber);
+
     if ( C4::Context->preference('NewItemsDefaultLocation') ) {
         $item->{'permanent_location'} = $item->{'location'};
         $item->{'location'} = C4::Context->preference('NewItemsDefaultLocation');
@@ -517,8 +518,8 @@ if ($op eq "additem") {
 
         # if barcode exists, don't create, but report The problem.
         unless ($exist_itemnumber) {
-            my ( $oldbiblionumber, $oldbibnum, $oldbibitemnum ) = AddItemFromMarc( $record, $biblionumber, $dbh );
-            set_item_default_location($oldbibitemnum);
+            my ( $oldbiblionumber, $oldbibnum, $oldbibitemnum, $item ) = AddItemFromMarc( $record, $biblionumber, $dbh );
+            set_item_default_location($oldbibitemnum, $item);
             my $err = C4::Biblio::UpdateDatereceived($biblionumber);
             push @errors, $err if $err;
             if ($addToPrintLabelsList) {
@@ -659,8 +660,8 @@ if ($op eq "additem") {
 
                 # Adding the item
                 if (!$exist_itemnumber) {
-                    my ($oldbiblionumber,$oldbibnum,$oldbibitemnum) = AddItemFromMarc( $record, $biblionumber, $dbh, 1 );
-                    set_item_default_location($oldbibitemnum);
+                    my ($oldbiblionumber,$oldbibnum,$oldbibitemnum, $item) = AddItemFromMarc( $record, $biblionumber, $dbh, 1 );
+                    set_item_default_location($oldbibitemnum, $item);
 
                     if ($addToPrintLabelsList) {
                         my $shelf = Koha::Virtualshelves->find( { owner => $loggedinuser, shelfname => 'labels printing'} );
