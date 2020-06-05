@@ -285,6 +285,71 @@ is( $is, 1, "Items availability: 1 item is available, 1 item held in T" );
 $is = IsAvailableForItemLevelRequest( $item3, $patron1);
 is( $is, 1, "Item can be held, items in transit are not available" );
 
+
+# Check for holds availability when different item types have different 
+# smart rules assigned both with "if all unavailable" set, 
+# and $itemtype rule allows holds, $itemtype2 rule disallows holds. 
+# So, $item should be available for hold when checked out even if $item2
+# is not checked out, because anyway $item2 unavailable for holds by rule
+# (Bug 24683):
+
+my $biblio1 = $builder->build_sample_biblio({itemtype=>$itemtype});
+my $biblionumber1 = $biblio1->biblionumber;
+my $item1_1 = $builder->build_sample_item({
+    biblionumber=>$biblionumber1,
+    itype=>$itemtype,
+    homebranch => $library_A,
+    holdingbranch => $library_A
+});
+my $item1_2 = $builder->build_sample_item({
+    biblionumber=>$biblionumber1,
+    itype=>$itemtype2,
+    homebranch => $library_A,
+    holdingbranch => $library_A
+});
+
+# Test hold_fulfillment_policy
+$dbh->do("DELETE FROM circulation_rules");
+Koha::CirculationRules->set_rules(
+    {
+        categorycode => undef,
+        itemtype     => $itemtype,
+        branchcode   => undef,
+        rules        => {
+            issuelength      => 7,
+            lengthunit       => 8,
+            reservesallowed  => 0,
+            holds_per_record => 0,
+            onshelfholds     => 2,
+        }
+    }
+);
+Koha::CirculationRules->set_rules(
+    {
+        categorycode => undef,
+        itemtype     => $itemtype2,
+        branchcode   => undef,
+        rules        => {
+            issuelength      => 7,
+            lengthunit       => 8,
+            reservesallowed  => 0,
+            holds_per_record => 0,
+            onshelfholds     => 2,
+        }
+    }
+);
+
+$is = ItemsAnyAvailableAndNotRestricted( { biblionumber => $biblionumber1, patron => $patron1 });
+is( $is, 1, "Items availability: 2 items, one allowed by smart rule but not checked out, another one not allowed to be held by smart rule" );
+
+AddIssue( $patron2->unblessed, $item1_1->barcode );
+
+$is = ItemsAnyAvailableAndNotRestricted( { biblionumber => $biblionumber1, patron => $patron1 });
+is( $is, 0, "Items availability: 2 items, one allowed by smart rule and checked out, another one not allowed to be held by smart rule" );
+
+AddReturn( $item1_1->barcode );
+
+
 # Cleanup
 $schema->storage->txn_rollback;
 
