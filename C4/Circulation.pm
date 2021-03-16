@@ -2255,24 +2255,34 @@ sub AddReturn {
         and !$resfound;
 
     # check if we have a transfer for this document and some special cases for transfer:
+    # (get_transfer returns transfer which yet not arrived nor cancelled,
+    # but also returns not started transfers too (requests) ):
     if (my $transfer = $item->get_transfer) {
-        $item_can_be_transferred = 0;
+        # in_transit returns transfer which not arrived but sent:
         if ( $transfer->in_transit ) {
             if ( $transfer->tobranch eq $branch ) {
                 $transfer->receive;
                 $messages->{'TransferArrived'} = $transfer->frombranch;
             }
             else {
+                $item_can_be_transferred = 0;
+                    # we keep current transfer if it came not to the target branch
+                    # and prevent further analysis for "should utem be transfered" ("atuoreturns"/etc)
                 $messages->{'WrongTransfer'}     = $transfer->tobranch;
                 $messages->{'WrongTransferItem'} = $item->itemnumber;
             }
         }
+        # this part happens only when transfer not yet sent:
         else {
             if ( $transfer->tobranch eq $branch ) {
-                $transfer->receive;
+                # $transfer->receive; # why the hell we recieve again if item anyway received?
+                                      # this again changes datearrived => dt_from_string for item. Why?
+                                      # also, ModDateLastSeen already called above in the code
+                # inform the operator from where transfer arrived last time to operator's branch:
                 $messages->{'TransferArrived'} = $transfer->frombranch;
             }
             else {
+                # inform operator about last transfer (why?):
                 $messages->{'WasTransfered'}   = $transfer->tobranch;
                 $messages->{'TransferTrigger'} = $transfer->reason;
             }
@@ -2280,7 +2290,7 @@ sub AddReturn {
     }
 
     # Transfer to returnbranch if Automatic transfer set or append message NeedsTransfer
-    if ( $item_can_be_transferred 
+    if ( $item_can_be_transferred
         and ( $branch ne $returnbranch ) )
     {
         my $BranchTransferLimitsType = C4::Context->preference("BranchTransferLimitsType") eq 'itemtype' ? 'effective_itemtype' : 'ccode';
