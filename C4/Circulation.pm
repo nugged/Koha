@@ -1977,7 +1977,6 @@ sub AddReturn {
     my $messages;
     my $patron;
     my $doreturn       = 1;
-    my $validTransfer = 1;
     my $stat_type = 'return';
 
     # get information on item
@@ -2161,35 +2160,6 @@ sub AddReturn {
         }
     }
 
-    # check if we have a transfer for this document
-    my $transfer = $item->get_transfer;
-
-    # if we have a transfer to complete, we update the line of transfers with the datearrived
-    my $is_in_rotating_collection = C4::RotatingCollections::isItemInAnyCollection( $item->itemnumber );
-    if ($transfer) {
-        $validTransfer = 0;
-        if ( $transfer->in_transit ) {
-            if ( $transfer->tobranch eq $branch ) {
-                $transfer->receive;
-                $messages->{'TransferArrived'} = $transfer->frombranch;
-            }
-            else {
-                $messages->{'WrongTransfer'}     = $transfer->tobranch;
-                $messages->{'WrongTransferItem'} = $item->itemnumber;
-            }
-        }
-        else {
-            if ( $transfer->tobranch eq $branch ) {
-                $transfer->receive;
-                $messages->{'TransferArrived'} = $transfer->frombranch;
-            }
-            else {
-                $messages->{'WasTransfered'}   = $transfer->tobranch;
-                $messages->{'TransferTrigger'} = $transfer->reason;
-            }
-        }
-    }
-
     # fix up the overdues in accounts...
     if ($borrowernumber) {
         my $fix = _FixOverduesOnReturn( $borrowernumber, $item->itemnumber, $exemptfine, 'RETURNED' );
@@ -2274,6 +2244,36 @@ sub AddReturn {
             { biblio_id => $item->biblio->biblionumber }
         );
         $request->status('RET') if $request;
+    }
+
+    # if we have a transfer to complete, we update the line of transfers with the datearrived
+    my $is_in_rotating_collection = C4::RotatingCollections::isItemInAnyCollection( $item->itemnumber );
+
+    my $validTransfer = 1;
+
+    # check if we have a transfer for this document and some special cases for transfer:
+    if (my $transfer = $item->get_transfer) {
+        $validTransfer = 0;
+        if ( $transfer->in_transit ) {
+            if ( $transfer->tobranch eq $branch ) {
+                $transfer->receive;
+                $messages->{'TransferArrived'} = $transfer->frombranch;
+            }
+            else {
+                $messages->{'WrongTransfer'}     = $transfer->tobranch;
+                $messages->{'WrongTransferItem'} = $item->itemnumber;
+            }
+        }
+        else {
+            if ( $transfer->tobranch eq $branch ) {
+                $transfer->receive;
+                $messages->{'TransferArrived'} = $transfer->frombranch;
+            }
+            else {
+                $messages->{'WasTransfered'}   = $transfer->tobranch;
+                $messages->{'TransferTrigger'} = $transfer->reason;
+            }
+        }
     }
 
     # Transfer to returnbranch if Automatic transfer set or append message NeedsTransfer
