@@ -2249,11 +2249,14 @@ sub AddReturn {
     # if we have a transfer to complete, we update the line of transfers with the datearrived
     my $is_in_rotating_collection = C4::RotatingCollections::isItemInAnyCollection( $item->itemnumber );
 
-    my $validTransfer = 1;
+    my $item_can_be_transferred =
+        !$is_in_rotating_collection
+        && ( $doreturn or $messages->{'NotIssued'} )
+        and !$resfound;
 
     # check if we have a transfer for this document and some special cases for transfer:
     if (my $transfer = $item->get_transfer) {
-        $validTransfer = 0;
+        $item_can_be_transferred = 0;
         if ( $transfer->in_transit ) {
             if ( $transfer->tobranch eq $branch ) {
                 $transfer->receive;
@@ -2277,12 +2280,8 @@ sub AddReturn {
     }
 
     # Transfer to returnbranch if Automatic transfer set or append message NeedsTransfer
-    if ( $validTransfer && !$is_in_rotating_collection
-        && ( $doreturn or $messages->{'NotIssued'} )
-        and !$resfound
-        and ( $branch ne $returnbranch )
-        and not $messages->{'WrongTransfer'}
-        and not $messages->{'WasTransfered'} )
+    if ( $item_can_be_transferred 
+        and ( $branch ne $returnbranch ) )
     {
         my $BranchTransferLimitsType = C4::Context->preference("BranchTransferLimitsType") eq 'itemtype' ? 'effective_itemtype' : 'ccode';
         if  (C4::Context->preference("AutomaticItemReturn"    ) or
