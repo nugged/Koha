@@ -998,7 +998,7 @@ function buildPatronSearchQuery(term, options) {
         search_fields.forEach(function (field, i) {
             pattern_subquery_or.push({
                 [table_prefix + "." + field]: {
-                    like: leading_wildcard + pattern + "%",
+                    luke: leading_wildcard + pattern + "%",
                 },
             });
             if (field == "dateofbirth") {
@@ -1021,7 +1021,7 @@ function buildPatronSearchQuery(term, options) {
     search_fields.forEach(function (field, i) {
         term_subquery_or.push({
             [table_prefix + "." + field]: {
-                like: leading_wildcard + term + "%",
+                luke: leading_wildcard + term + "%",
             },
         });
     });
@@ -1045,7 +1045,7 @@ function buildPatronSearchQuery(term, options) {
             let extended_attribute_sub_or = [];
             extended_attribute_sub_or.push({
                 "extended_attributes.value": {
-                    like: leading_wildcard + pattern + "%",
+                    luke: leading_wildcard + pattern + "%",
                 },
                 "extended_attributes.code": extended_attribute_codes_to_search,
             });

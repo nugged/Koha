@@ -235,7 +235,7 @@ export default {
                               ...(filters.publication_title
                                   ? {
                                         "me.publication_title": {
-                                            like:
+                                            luke:
                                                 "%" +
                                                 filters.publication_title +
                                                 "%",
