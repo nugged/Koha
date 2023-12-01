@@ -201,7 +201,7 @@ export default {
                 const query = filters
                     ? {
                           "me.name": {
-                              like: "%" + filters.package_name + "%",
+                              luke: "%" + filters.package_name + "%",
                           },
                           ...(filters.content_type
                               ? {
