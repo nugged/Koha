@@ -1,0 +1,8 @@
+Origin: Koha NT
+Label: Koha NT
+Suite: preproduction
+Codename: unstable
+Architectures: source i386 amd64
+Components: main
+Description: Packages for NT Koha fork unstable
+SignWith: testkey
