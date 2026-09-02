@@ -671,12 +671,12 @@ export default {
                     "-and": [
                         {
                             "me.name": {
-                                like: `%${baseResource.route.query.supplier}%`,
+                                luke: `%${baseResource.route.query.supplier}%`,
                             },
                         },
                         {
                             "aliases.alias": {
-                                like: `%${baseResource.route.query.supplier}%`,
+                                luke: `%${baseResource.route.query.supplier}%`,
                             },
                         },
                     ],
