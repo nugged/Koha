@@ -40,6 +40,25 @@ t::lib::Mocks::mock_preference( 'StaffPatronDataDisclosureMaxSubjects', 1000 );
 
 my $t = Test::Mojo->new('Koha::REST::V1');
 
+# Mojolicious runs after_dispatch hooks in reverse registration order. This
+# later hook must therefore contribute its subject before Koha finalizes the
+# response-bound event registered during application startup.
+$t->app->hook(
+    after_dispatch => sub {
+        my ($c) = @_;
+
+        my $patron_id = $c->req->headers->header('x-koha-test-late-disclosure-subject');
+        return unless $patron_id;
+
+        $c->patron_disclosure->add_subject(
+            {
+                patron_id    => $patron_id,
+                data_classes => ['identity'],
+            }
+        );
+    }
+);
+
 sub disclosure_logs {
     return Koha::ActionLogs->search(
         {
@@ -179,6 +198,36 @@ subtest 'authentication sources produce equivalent disclosure events' => sub {
     ok(
         !grep( { payload($_)->{event_id} eq 'forged-client-event-id' } @logs ),
         'a client request ID is never adopted as the event ID'
+    );
+
+    $schema->storage->txn_rollback;
+    done_testing;
+};
+
+subtest 'finalizer runs after later response post-processing hooks' => sub {
+    $schema->storage->txn_begin;
+    clear_disclosure_logs();
+
+    my ( $actor, $password ) = build_actor();
+    my $target       = $builder->build_object( { class => 'Koha::Patrons' } );
+    my $late_subject = $builder->build_object( { class => 'Koha::Patrons' } );
+
+    $t->get_ok(
+        '//' . $actor->userid . ":$password\@/api/v1/patrons/" . $target->id => {
+            'x-koha-test-late-disclosure-subject' => $late_subject->id,
+        }
+    )->status_is(200);
+
+    my @logs = disclosure_logs()->as_list;
+    is_deeply(
+        [ sort { $a <=> $b } map { 0 + $_->object } @logs ],
+        [ sort { $a <=> $b } ( $target->id, $late_subject->id ) ],
+        'the finalizer includes subjects added by a later response hook'
+    );
+    is(
+        scalar( keys %{ { map { payload($_)->{event_id} => 1 } @logs } } ),
+        1,
+        'both subjects belong to the same response event'
     );
 
     $schema->storage->txn_rollback;

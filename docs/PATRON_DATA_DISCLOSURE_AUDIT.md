@@ -105,7 +105,7 @@ For covered list operations with bounded subject fan-out per result row, OpenAPI
 
 The biblio-items response has up to three single-valued patron relations plus return claims. Its fixed estimate is therefore four subjects per item, but historical `return_claims` is a `has_many` relation and has no schema-level finite maximum. The exact shared subject limit remains the final fail-closed guard after serialization and before disclosure; it covers additional historical claims, nested subjects, and explicitly collected subjects. This may replace an unusually broad successful response with `503`, but never emits an unlogged patron ID.
 
-The existing early-registered `after_dispatch` callback finalizes the event after JSON-to-XML conversion and after later plugin callbacks. An in-tree test must prove that ordering on the supported Koha Mojolicious stack. The finalizer writes only when the response matches a declared personal-data representation. Covered error responses are tested to be PII-free.
+The existing early-registered `after_dispatch` callback finalizes the event after JSON-to-XML conversion and after later plugin callbacks. The DB-dependent REST integration test registers a later callback that contributes another subject and requires both subjects to be committed in one event, proving the runtime ordering on the supported Koha Mojolicious stack. The finalizer writes only when the response matches a declared personal-data representation. Covered error responses are tested to be PII-free.
 
 If the write fails, the finalizer replaces status, body, content type, content length, redirect, attachment, pagination, entity, and request-correlation headers with a generic `503` response. It must not call `render` recursively.
 
@@ -147,6 +147,7 @@ The first upstream series is a staged core slice, not a claim of complete staff-
 - redesign successful mutation responses from `circ/circulation.pl` so a failed audit cannot invite a duplicate checkout, return, hold, or claim-resolution retry;
 - redesign `svc/renew` and `svc/checkin` so a failed audit cannot follow an already committed mutation;
 - cover `circ/returns.pl`, `circ/pendingreserves.pl`, and `circ/waitingreserves.pl` after their exact rendered patron sets are proven by tests;
+- separate generic action-log access from ordinary staff access and design its meta-audit or redaction boundary. Since Bug 40136, `MEMBERS` create, modify, and delete rows can carry patron values in `info` and `diff`, while other modules retain free-form payloads that do not always expose a trustworthy typed patron subject. Merely annotating `GET /api/v1/action_logs` would therefore create a false completeness claim;
 - fix known patron-visibility gate defects independently; successful disclosures through a defective gate must still be audited.
 
 ### Deferred families
@@ -166,7 +167,9 @@ Every deferred family needs its own reviewable dependent bug or series. A static
 
 ## Auditor access and SQL
 
-The first series reuses `tools.view_system_logs` for the existing action-log viewer and API. It does not create a new auditor role or UI. That permission is sufficient against an ordinary librarian without system-log access, but is broader than least privilege. The existing action-log API can embed patron and librarian representations for that privileged reader; reading or exporting those representations is itself an explicitly deferred meta-audit surface, not part of the ordinary-librarian claim.
+The first series reuses `tools.view_system_logs` for the existing action-log viewer and API. It does not create a new auditor role or UI. This granular permission can be granted without superlibrarian and must be treated as a trusted-auditor personal-data permission, not as an ordinary staff permission, while relying on the first-series threat boundary.
+
+The existing action-log API can embed patron and librarian representations for that privileged reader. `MEMBERS` rows created by current Koha can also expose patron values directly through `info` and `diff`, and the CSV path exports raw rows. Reading or exporting these representations is itself an explicitly deferred meta-audit surface. A non-superlibrarian with `tools.view_system_logs` is outside the first-series protection claim and can access such data without creating a `PATRON_DISCLOSURE` event. Closing that gap requires a separate permission and response design, or typed subject attribution and redaction for every PII-bearing action-log payload; it is not safely solved by adding a partial route annotation.
 
 Reviewed SQL is supplied as documentation and is never auto-installed as a saved report. Guided Reports uses `reports.execute_reports`, which is a different confidentiality boundary from `tools.view_system_logs`.
 
@@ -237,7 +240,7 @@ Before proposing new indexes, benchmark insertion, subject-history queries, time
 
 ## Threat model
 
-The stated attacker is an authenticated librarian who can access ordinary patron or circulation functions but does not have superlibrarian, system-administration, system-log, command-line, database, or server access.
+The stated attacker is an authenticated librarian who can access ordinary patron or circulation functions but does not have superlibrarian, system-administration, system-log, command-line, database, or server access. The system-log exclusion is material rather than shorthand for superlibrarian: `tools.view_system_logs` is independently assignable and currently exposes the deferred action-log channel described above.
 
 For covered responses, this attacker must not bypass logging by switching among session, Basic, and OAuth authentication, calling the legacy checkout or hold services directly, requesting XML, using nested REST embeds, refreshing requests, requesting an empty patron activity result, or causing an audit insert failure.
 
@@ -250,6 +253,7 @@ A user who can manage system preferences can disable the feature through Koha; t
 - preference off: no rows and unchanged responses;
 - preference on: one row per unique patron, one server UUID per response, class union, transactional rollback on any insert failure, and one post-commit event logger message;
 - two sequential requests in one persistent worker produce distinct events;
+- a later-registered REST `after_dispatch` hook contributes to the event before the audit finalizer commits it;
 - a forged `x-koha-request-id` never becomes the stored event ID;
 - session, Basic, and OAuth calls to the same covered operation all log equivalent disclosures;
 - nested item embeds log every distinct Patron represented plus mapped bare patron-owner IDs, exclude staff provenance IDs, and ignore server-side relationships that were not serialized;
