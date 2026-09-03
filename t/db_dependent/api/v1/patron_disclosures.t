@@ -9,6 +9,7 @@
 
 use Modern::Perl;
 
+use File::Temp                qw( tempdir );
 use JSON                      qw( decode_json );
 use Module::Load::Conditional qw( can_load );
 use Test::MockModule;
@@ -31,7 +32,10 @@ my $schema  = Koha::Database->new->schema;
 my $builder = t::lib::TestBuilder->new;
 
 # DBI-backed CGI sessions force AutoCommit and break the surrounding test
-# transaction. The production authentication path is otherwise unchanged.
+# transaction. Packaged instances can also configure a daemon-owned temporary
+# directory, so keep file-backed test sessions in a process-owned directory.
+my $session_tmpdir = tempdir( CLEANUP => 1 );
+t::lib::Mocks::mock_config( 'tmp_path', $session_tmpdir );
 t::lib::Mocks::mock_preference( 'SessionStorage',                       'tmp' );
 t::lib::Mocks::mock_preference( 'RESTBasicAuth',                        1 );
 t::lib::Mocks::mock_preference( 'RESTOAuth2ClientCredentials',          1 );
