@@ -32,6 +32,35 @@ function toInt(value) {
     return isNaN(parsed) ? 0 : parsed;
 }
 
+async function fetchAllKohaApiPages(endpoint, headers = {}) {
+    const records = [];
+    const url = new URL(endpoint, window.location.origin);
+    url.searchParams.delete("_per_page");
+
+    for (let page = 1; ; page++) {
+        url.searchParams.set("_page", page);
+        const response = await fetch(url, { headers });
+        if (!response.ok) {
+            throw new Error(response.statusText || "API request failed");
+        }
+
+        const pageRecords = await response.json();
+        if (!Array.isArray(pageRecords)) {
+            throw new Error("Expected a paginated API response");
+        }
+
+        records.push(...pageRecords);
+        const totalHeader = response.headers.get("X-Total-Count");
+        const total = totalHeader === null ? undefined : Number(totalHeader);
+        if (
+            pageRecords.length === 0 ||
+            (Number.isInteger(total) && total >= 0 && records.length >= total)
+        ) {
+            return records;
+        }
+    }
+}
+
 /**
  * Normalize a date to start of day using dayjs
  * @param {Date|string|dayjs} date - Date to normalize
@@ -403,44 +432,34 @@ $("#placeBookingModal").on("show.bs.modal", function (e) {
 
     if (!dataFetched) {
         // Fetch list of bookable items
-        let itemsFetch = $.ajax({
-            url:
-                "/api/v1/biblios/" +
+        const itemsFetch = fetchAllKohaApiPages(
+            "/api/v1/biblios/" +
                 biblionumber +
-                "/items?bookable=1" +
-                "&_per_page=-1",
-            dataType: "json",
-            type: "GET",
-            headers: {
+                "/items?bookable=1",
+            {
                 "x-koha-embed": "item_type",
-            },
-        });
+            }
+        );
 
         // Fetch list of existing bookings
-        let bookingsFetch = $.ajax({
-            url:
-                "/api/v1/bookings?biblio_id=" +
+        const bookingsFetch = fetchAllKohaApiPages(
+            "/api/v1/bookings?biblio_id=" +
                 biblionumber +
-                "&_per_page=-1" +
                 '&q={"status":{"-in":["new","pending","active"]}}',
-            dataType: "json",
-            type: "GET",
-        });
+        );
 
         // Fetch list of current checkouts
-        let checkoutsFetch = $.ajax({
-            url: "/api/v1/biblios/" + biblionumber + "/checkouts?_per_page=-1",
-            dataType: "json",
-            type: "GET",
-        });
+        const checkoutsFetch = fetchAllKohaApiPages(
+            "/api/v1/biblios/" + biblionumber + "/checkouts"
+        );
 
         // Update item select2 and period flatpickr
-        $.when(itemsFetch, bookingsFetch, checkoutsFetch).then(
-            function (itemsFetch, bookingsFetch, checkoutsFetch) {
+        Promise.all([itemsFetch, bookingsFetch, checkoutsFetch]).then(
+            function ([itemsResponse, bookingsResponse, checkoutsResponse]) {
                 // Set variables
-                bookable_items = itemsFetch[0];
-                bookings = bookingsFetch[0];
-                checkouts = checkoutsFetch[0];
+                bookable_items = itemsResponse;
+                bookings = bookingsResponse;
+                checkouts = checkoutsResponse;
 
                 // Merge current checkouts into bookings
                 for (checkout of checkouts) {
@@ -2133,8 +2152,8 @@ $("#placeBookingModal").on("show.bs.modal", function (e) {
                     periodPicker
                 );
             },
-            function (jqXHR, textStatus, errorThrown) {
-                console.log("Fetch failed");
+            function (error) {
+                console.error("Fetch failed", error);
             }
         );
     } else {
