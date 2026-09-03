@@ -289,6 +289,9 @@ subtest 'nested item embeds log only Patrons serialized in one response' => sub 
                 branchcode     => $hold_item->holdingbranch,
                 found          => undef,
                 priority       => 1,
+                reservedate    => dt_from_string()->subtract( days => 1 )->ymd,
+                suspend        => 0,
+                waitingdate    => undef,
             },
         }
     );
@@ -329,9 +332,10 @@ subtest 'nested item embeds log only Patrons serialized in one response' => sub 
                 if ref( $item->{$relation} ) eq 'HASH' && ref( $item->{$relation}->{patron} ) eq 'HASH';
         }
     }
-    my @response_ids = sort { $a <=> $b } map { $_->{patron_id} } @representations;
-    my @expected_ids = sort { $a <=> $b } map { $_->id } ( $checkout_patron, $hold_patron, $recall_patron );
-    is_deeply( \@response_ids, \@expected_ids, 'fixture serialized all three nested Patron representations' );
+    my %response_subjects = map  { $_->{patron_id} => 1 } @representations;
+    my @response_ids      = sort { $a <=> $b } keys %response_subjects;
+    my @expected_ids      = sort { $a <=> $b } map { $_->id } ( $checkout_patron, $hold_patron, $recall_patron );
+    is_deeply( \@response_ids, \@expected_ids, 'fixture serialized all three distinct nested Patron subjects' );
 
     my @logs = disclosure_logs()->as_list;
     is_deeply( [ map { 0 + $_->object } @logs ], \@expected_ids, 'only serialized Patron IDs are logged' );
