@@ -202,8 +202,10 @@ my $patron_messages = Koha::Patron::Messages->search(
 if ( $patron_messages->count > 0 ) {
     $template->param( patron_messages => $patron_messages );
 }
-my @message_manager_ids =
-    $patron_disclosure_enabled ? grep { defined $_ } $patron_messages->get_column('manager_id')->all : ();
+my @message_manager_ids;
+if ($patron_disclosure_enabled) {
+    @message_manager_ids = grep { defined $_ } $patron_messages->get_column('manager_id');
+}
 
 # Display the language description instead of the code
 # Note that this is certainly wrong

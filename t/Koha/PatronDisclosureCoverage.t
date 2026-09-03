@@ -217,6 +217,22 @@ for my $file ( sort keys %expected_cgi ) {
     for my $surface ( @{ $expected_cgi{$file} } ) {
         like( $source, qr/'\Q$surface\E'/, "$file declares stable surface $surface" );
     }
+
+    if ( $file eq 'circ/circulation.pl' || $file eq 'members/moremember.pl' ) {
+        unlike(
+            $source,
+            qr/\$patron_messages->get_column\('manager_id'\)->all/,
+            "$file does not treat Koha::Objects->get_column as a DBIx resultset"
+        );
+    }
+
+    if ( $file eq 'members/moremember.pl' ) {
+        like(
+            $source,
+            qr/my \@message_manager_ids;\s*if \(\$patron_disclosure_enabled\) \{\s*\@message_manager_ids = grep \{ defined \$_ \}\s*\$patron_messages->get_column\('manager_id'\);\s*\}/s,
+            "$file discovers message managers inside an explicit enabled branch"
+        );
+    }
 }
 
 my %expected_svc = (

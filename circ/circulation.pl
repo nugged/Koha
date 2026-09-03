@@ -833,7 +833,7 @@ if ($patron) {
     $template->param( patron_messages => $patron_messages );
     if ($patron_disclosure_enabled) {
         $add_patron_disclosure_subject->( $_, 'identity' )
-            for grep { defined $_ } $patron_messages->get_column('manager_id')->all;
+            for grep { defined $_ } $patron_messages->get_column('manager_id');
     }
 
     if ( C4::Context->preference("WaitingNotifyAtCheckout") ) {
