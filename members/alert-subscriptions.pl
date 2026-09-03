@@ -24,6 +24,7 @@ use C4::Auth qw( get_template_and_user );
 use C4::Context;
 use C4::Output qw( output_and_exit_if_error output_and_exit output_html_with_http_headers );
 use Koha::Patrons;
+use Koha::Patron::Disclosure;
 
 my $input = CGI->new;
 
@@ -37,7 +38,7 @@ my ( $template, $loggedinuser, $cookie ) = get_template_and_user(
 );
 
 my $borrowernumber = $input->param('borrowernumber');
-my $op             = $input->param('op');
+my $op             = $input->param('op') // q{};
 
 my $logged_in_user = Koha::Patrons->find($loggedinuser);
 my $patron         = Koha::Patrons->find($borrowernumber);
@@ -58,4 +59,15 @@ $template->param(
     alertsview => 1,
 );
 
-output_html_with_http_headers $input, $cookie, $template->output;
+my $extra_options;
+if ( Koha::Patron::Disclosure->enabled && $op !~ /\Acud-/ ) {
+    my @data_classes = ( @{ Koha::Patron::Disclosure->staff_sidebar_data_classes }, 'communications' );
+    $extra_options = {
+        patron_disclosure => {
+            surface  => 'patrons.alerts.list',
+            subjects => [ { patron_id => $patron->id, data_classes => \@data_classes } ],
+        }
+    };
+}
+
+output_html_with_http_headers( $input, $cookie, $template->output, undef, $extra_options );

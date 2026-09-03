@@ -24,9 +24,11 @@ use JSON qw(to_json);
 
 use C4::Auth qw(check_cookie_auth haspermission);
 use C4::Context;
+use C4::Output qw( output_with_http_headers );
 
 use Koha::AuthorisedValues;
 use Koha::DateUtils qw( dt_from_string output_pref );
+use Koha::Patron::Disclosure;
 use Koha::Patrons;
 
 my $input = CGI->new;
@@ -63,7 +65,9 @@ $sorting_direction = $sorting_direction eq 'asc' ? 'asc' : 'desc';
 $results_per_page = undef if ( $results_per_page == -1 );
 
 binmode STDOUT, ":encoding(UTF-8)";
-print $input->header( -type => 'application/json', -charset => 'UTF-8' );
+
+my $disclosure_enabled = Koha::Patron::Disclosure->enabled;
+my %resolver_patron_ids;
 
 my $sql = qq{
     SELECT
@@ -101,7 +105,14 @@ while ( my $claim = $sth->fetchrow_hashref() ) {
         if $claim->{resolved_on};
 
     my $patron = $claim->{resolved_by} ? Koha::Patrons->find( $claim->{resolved_by} ) : undef;
-    $claim->{resolved_by_data} = $patron->unblessed if $patron;
+    if ($patron) {
+        $claim->{resolved_by_data} = {
+            borrowernumber => $patron->borrowernumber,
+            firstname      => $patron->firstname,
+            surname        => $patron->surname,
+        };
+        $resolver_patron_ids{ $patron->borrowernumber } = 1 if $disclosure_enabled;
+    }
 
     my $resolution = $claim->{resolution}
         ? Koha::AuthorisedValues->find(
@@ -127,4 +138,26 @@ my $data = {
     unresolved           => $unresolved
 };
 
-print to_json($data);
+my $extra_options;
+if ( $disclosure_enabled && defined $borrowernumber && length $borrowernumber ) {
+    my @subjects = (
+        {
+            patron_id    => $borrowernumber,
+            data_classes => [qw( identity service_activity )],
+        },
+        map {
+            {
+                patron_id    => $_,
+                data_classes => ['identity'],
+            }
+        } sort { $a <=> $b } keys %resolver_patron_ids
+    );
+    $extra_options = {
+        patron_disclosure => {
+            surface  => 'patrons.return_claims.list',
+            subjects => \@subjects,
+        }
+    };
+}
+
+output_with_http_headers( $input, undef, to_json($data), 'json', undef, $extra_options );

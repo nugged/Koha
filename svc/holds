@@ -25,11 +25,13 @@ use JSON qw(to_json);
 use C4::Auth qw(check_cookie_auth);
 use C4::Charset;
 use C4::Context;
+use C4::Output qw( output_with_http_headers );
 
 use Koha::DateUtils qw( dt_from_string output_pref );
 use Koha::Holds;
 use Koha::ItemTypes;
 use Koha::Libraries;
+use Koha::Patron::Disclosure;
 
 my $input = CGI->new;
 
@@ -56,7 +58,6 @@ my $iSortCol          = $input->param('iSortCol_0') // 0;
 my $sorting_column    = $sort_columns[$iSortCol]    // 'reservedate';
 
 binmode STDOUT, ":encoding(UTF-8)";
-print $input->header( -type => 'application/json', -charset => 'UTF-8' );
 
 my $holds_rs = Koha::Holds->search(
     { borrowernumber => $borrowernumber },
@@ -169,4 +170,14 @@ $data->{'iTotalDisplayRecords'} = scalar @holds;
 $data->{'sEcho'}                = $input->param('sEcho') || undef;
 $data->{'aaData'}               = \@holds;
 
-print to_json($data);
+my $extra_options;
+if ( Koha::Patron::Disclosure->enabled && defined $borrowernumber && length $borrowernumber ) {
+    $extra_options = {
+        patron_disclosure => {
+            surface  => 'patrons.holds.list',
+            subjects => [ { patron_id => $borrowernumber, data_classes => [qw( identity circulation_current )] } ],
+        }
+    };
+}
+
+output_with_http_headers( $input, undef, to_json($data), 'json', undef, $extra_options );

@@ -20,6 +20,7 @@ use Modern::Perl;
 use CGI        qw ( -utf8 );
 use C4::Auth   qw( get_template_and_user );
 use C4::Output qw( output_html_with_http_headers );
+use Koha::Patron::Disclosure;
 
 my $input = CGI->new;
 my ( $template, $loggedinuser, $cookie ) = get_template_and_user(
@@ -43,4 +44,15 @@ $template->param(
     specific_patron => 1,
 );
 
-output_html_with_http_headers $input, $cookie, $template->output;
+my $extra_options;
+if ( Koha::Patron::Disclosure->enabled && $patron ) {
+    my @data_classes = ( @{ Koha::Patron::Disclosure->staff_sidebar_data_classes }, 'circulation_history' );
+    $extra_options = {
+        patron_disclosure => {
+            surface  => 'patrons.recalls.history',
+            subjects => [ { patron_id => $patron->id, data_classes => \@data_classes } ],
+        }
+    };
+}
+
+output_html_with_http_headers( $input, $cookie, $template->output, undef, $extra_options );

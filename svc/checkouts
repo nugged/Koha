@@ -24,6 +24,7 @@ use JSON qw(to_json);
 
 use C4::Auth        qw(check_cookie_auth haspermission);
 use C4::Circulation qw(GetIssuingCharges CanBookBeRenewed GetRenewCount );
+use C4::Output      qw( output_with_http_headers );
 use C4::Overdues    qw(GetFine);
 use C4::Context;
 
@@ -32,6 +33,7 @@ use Koha::DateUtils qw( dt_from_string output_pref );
 use Koha::Items;
 use Koha::ItemTypes;
 use Koha::ILL::ISO18626::Requests;
+use Koha::Patron::Disclosure;
 
 my $input = CGI->new;
 
@@ -64,7 +66,6 @@ $sorting_direction = $sorting_direction eq 'asc' ? 'asc' : 'desc';
 $results_per_page = undef if ( $results_per_page == -1 );
 
 binmode STDOUT, ":encoding(UTF-8)";
-print $input->header( -type => 'application/json', -charset => 'UTF-8' );
 
 my @parameters;
 my $sql = '
@@ -349,4 +350,21 @@ $data->{'iTotalDisplayRecords'} = scalar @checkouts;
 $data->{'sEcho'}                = $input->param('sEcho') || undef;
 $data->{'aaData'}               = \@checkouts;
 
-print to_json($data);
+my $extra_options;
+if ( Koha::Patron::Disclosure->enabled && @borrowernumber ) {
+    my %requested_patron_ids = map { $_ => 1 } @borrowernumber;
+    my @subjects             = map {
+        {
+            patron_id    => $_,
+            data_classes => [qw( identity circulation_current financial service_activity )],
+        }
+    } keys %requested_patron_ids;
+    $extra_options = {
+        patron_disclosure => {
+            surface  => @subjects > 1 ? 'patrons.checkouts.current_batch' : 'patrons.checkouts.current',
+            subjects => \@subjects,
+        }
+    };
+}
+
+output_with_http_headers( $input, undef, to_json($data), 'json', undef, $extra_options );

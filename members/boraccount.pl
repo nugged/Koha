@@ -31,6 +31,7 @@ use C4::Accounts;
 use C4::Letters;
 use Koha::Cash::Registers;
 use Koha::Patrons;
+use Koha::Patron::Disclosure;
 use Koha::Patron::Categories;
 use Koha::Items;
 use Koha::Token;
@@ -284,4 +285,18 @@ $template->param(
     receipt_sent  => $receipt_sent,
 );
 
-output_html_with_http_headers $input, $cookie, $template->output;
+my $extra_options;
+if ( Koha::Patron::Disclosure->enabled && $op !~ /\Acud-/ ) {
+    my @data_classes = (
+        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes },
+        qw( circulation_current circulation_history financial )
+    );
+    $extra_options = {
+        patron_disclosure => {
+            surface  => 'patrons.account.transactions',
+            subjects => [ { patron_id => $patron->id, data_classes => \@data_classes } ],
+        }
+    };
+}
+
+output_html_with_http_headers( $input, $cookie, $template->output, undef, $extra_options );

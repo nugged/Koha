@@ -31,6 +31,7 @@ use Koha::DateUtils qw( dt_from_string );
 use Koha::ActionLogs;
 
 use Koha::Patrons;
+use Koha::Patron::Disclosure;
 use Koha::Patron::Categories;
 
 my $input = CGI->new;
@@ -117,5 +118,23 @@ $template->param(
     patron            => $patron,
     readingrecordview => 1,
 );
-output_html_with_http_headers $input, $cookie, $template->output;
-
+my $extra_options;
+if ( Koha::Patron::Disclosure->enabled ) {
+    my @data_classes = (
+        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes },
+        qw( circulation_current circulation_history )
+    );
+    $extra_options = {
+        patron_disclosure => {
+            surface  => 'patrons.circulation.history',
+            subjects => [ { patron_id => $patron->id, data_classes => \@data_classes } ],
+        }
+    };
+}
+output_html_with_http_headers(
+    $input,
+    $cookie,
+    $template->output,
+    undef,
+    $extra_options
+);

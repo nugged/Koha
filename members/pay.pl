@@ -39,6 +39,7 @@ use C4::Koha;
 use C4::Overdues;
 use Koha::Patrons;
 use Koha::Items;
+use Koha::Patron::Disclosure;
 
 use Koha::Patron::Categories;
 use URI::Escape qw( uri_escape_utf8 uri_unescape );
@@ -133,7 +134,21 @@ $template->param(
 
 add_accounts_to_template();
 
-output_html_with_http_headers $input, $cookie, $template->output;
+my $extra_options;
+if ( Koha::Patron::Disclosure->enabled && $op !~ /^cud-/ ) {
+    my @data_classes = (
+        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes },
+        qw( circulation_current circulation_history financial )
+    );
+    $extra_options = {
+        patron_disclosure => {
+            surface  => 'patrons.account.outstanding',
+            subjects => [ { patron_id => $patron->id, data_classes => \@data_classes } ],
+        }
+    };
+}
+
+output_html_with_http_headers( $input, $cookie, $template->output, undef, $extra_options );
 
 sub add_accounts_to_template {
 

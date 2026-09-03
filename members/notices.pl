@@ -27,6 +27,7 @@ use C4::Members;
 use C4::Letters qw( GetPreparedLetter EnqueueLetter );
 use Koha::Patrons;
 use Koha::Patron::Categories;
+use Koha::Patron::Disclosure;
 use Koha::Patron::Password::Recovery qw( SendPasswordRecoveryEmail ValidateBorrowernumber );
 
 my $input = CGI->new;
@@ -146,5 +147,17 @@ $template->param(
     borrowernumber  => $borrowernumber,
     sentnotices     => 1,
 );
-output_html_with_http_headers $input, $cookie, $template->output;
 
+my $is_mutating_op = $op =~ /\Acud-/ || $op eq 'send_welcome' || $op eq 'send_password_reset';
+my $extra_options;
+if ( Koha::Patron::Disclosure->enabled && !$is_mutating_op ) {
+    my @data_classes = ( @{ Koha::Patron::Disclosure->staff_sidebar_data_classes }, 'communications' );
+    $extra_options = {
+        patron_disclosure => {
+            surface  => 'patrons.notices.list',
+            subjects => [ { patron_id => $patron->id, data_classes => \@data_classes } ],
+        }
+    };
+}
+
+output_html_with_http_headers( $input, $cookie, $template->output, undef, $extra_options );

@@ -39,6 +39,7 @@ BEGIN {
 }
 
 use HTML::Entities;
+use JSON         qw( encode_json );
 use Scalar::Util qw( looks_like_number );
 use URI::Escape;
 
@@ -231,7 +232,45 @@ sub output_with_http_headers {
     my ( $query, $cookie, $data, $content_type, $status, $extra_options ) = @_;
     $status ||= '200 OK';
 
-    $extra_options //= {};
+    $extra_options = defined $extra_options ? {%$extra_options} : {};
+
+    my $patron_disclosure = delete $extra_options->{patron_disclosure};
+    if ( $patron_disclosure && $status =~ /\A2[0-9]{2}(?:\s|\z)/ ) {
+        my $ok = eval {
+            _commit_patron_disclosure($patron_disclosure);
+            1;
+        };
+
+        unless ($ok) {
+            my $surface = ref($patron_disclosure) eq 'HASH' ? $patron_disclosure->{surface} : q{};
+            $surface = 'invalid' unless defined $surface && $surface =~ /\A[a-z0-9_.]+\z/;
+            eval {
+                require Koha::Logger;
+                Koha::Logger->get(
+                    {
+                        interface => 'intranet',
+                        category  => 'ActionLogs.PATRON_DISCLOSURE.DISCLOSE',
+                    }
+                )->error("Patron disclosure audit failed for surface $surface");
+            };
+
+            $cookie        = undef;
+            $status        = '503 Service Unavailable';
+            $extra_options = { force_no_caching => 1 };
+            if ( $content_type eq 'json' ) {
+                $data = encode_json(
+                    {
+                        error      => 'Service unavailable',
+                        error_code => 'patron_disclosure_audit_unavailable',
+                    }
+                );
+            } else {
+                $content_type = 'html';
+                $data         = '<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">'
+                    . '<title>Service unavailable</title></head><body><h1>Service unavailable</h1></body></html>';
+            }
+        }
+    }
 
     my %content_type_map = (
         'html' => 'text/html',
@@ -272,6 +311,36 @@ sub output_with_http_headers {
 
     $data =~ s/\&amp\;amp\; /\&amp\; /g;
     print $query->header($options), $data;
+}
+
+sub _commit_patron_disclosure {
+    my ($descriptor) = @_;
+
+    require Koha::Patron::Disclosure;
+    die 'patron_disclosure must be a hash reference' unless ref($descriptor) eq 'HASH';
+
+    my %known   = map       { $_ => 1 } qw( surface subjects );
+    my @unknown = sort grep { !$known{$_} } keys %{$descriptor};
+    die 'patron_disclosure contains unknown key(s): ' . join( ', ', @unknown ) if @unknown;
+
+    my $subjects = $descriptor->{subjects};
+    die 'patron_disclosure.subjects must be a non-empty array reference'
+        unless ref($subjects) eq 'ARRAY' && @{$subjects};
+
+    my $event = Koha::Patron::Disclosure->new(
+        {
+            actor_id    => C4::Context->userenv->{number},
+            surface     => $descriptor->{surface},
+            breadth     => Koha::Patron::Disclosure->surface_breadth( $descriptor->{surface} ),
+            auth_source => 'session',
+            interface   => 'intranet',
+        }
+    );
+
+    $event->add_subject($_) for @{$subjects};
+    $event->commit;
+
+    return;
 }
 
 =item output_html_with_http_headers
