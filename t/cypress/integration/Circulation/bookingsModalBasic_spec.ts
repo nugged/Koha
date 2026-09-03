@@ -159,7 +159,10 @@ describe("Booking Modal Basic Tests", () => {
         cy.intercept("GET", "/api/v1/bookings*", request => {
             expect(request.query).not.to.have.property("_per_page");
             const page = Number(request.query._page);
-            const body = page === 1 ? [{ booking_id: 1 }, { booking_id: 2 }] : [{ booking_id: 3 }];
+            const body =
+                page === 1
+                    ? [{ booking_id: 1 }, { booking_id: 2 }]
+                    : [{ booking_id: 3 }];
             request.reply({
                 headers: { "X-Total-Count": "3" },
                 body,

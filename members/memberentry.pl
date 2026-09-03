@@ -958,12 +958,10 @@ my $extra_options;
 my $patron_disclosure_enabled = Koha::Patron::Disclosure->enabled;
 my %displayed_related_patron_ids;
 if ( $patron_disclosure_enabled && !$patron_state_changed ) {
-    $displayed_related_patron_ids{$_} = 1
-        for map { $_->id } grep { blessed($_) && $_->can('id') } @existing_guarantors;
+    $displayed_related_patron_ids{$_} = 1 for map { $_->id } grep { blessed($_) && $_->can('id') } @existing_guarantors;
     $displayed_related_patron_ids{ $guarantor->id } = 1 if blessed($guarantor) && $guarantor->can('id');
     if ($nok) {
-        $displayed_related_patron_ids{$_} = 1
-            for map { $_->id } grep { blessed($_) && $_->can('id') } @guarantors;
+        $displayed_related_patron_ids{$_} = 1 for map { $_->id } grep { blessed($_) && $_->can('id') } @guarantors;
     }
 }
 
