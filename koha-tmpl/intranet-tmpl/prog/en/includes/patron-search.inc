@@ -380,7 +380,7 @@
                     surname: function(){
                         let start_with = parent_block.find(".firstletter_filter").val()
                         if (!start_with) return "";
-                        return { "like": start_with + "%" }
+                        return { "luke": start_with + "%" }
                     },
                     "-and": function(){
                         let filters = [];

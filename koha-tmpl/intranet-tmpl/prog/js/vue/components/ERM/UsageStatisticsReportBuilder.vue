@@ -468,7 +468,7 @@ export default {
                     : [];
                 const dataQueryObject = {};
                 dataQueryObject[data_type.value] = {
-                    "-like": `${e.target.value}%`,
+                    "-luke": `${e.target.value}%`,
                 };
                 if (providers.length) {
                     dataQueryObject.usage_data_provider_id = providers;
