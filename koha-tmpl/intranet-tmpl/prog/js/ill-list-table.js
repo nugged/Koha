@@ -234,7 +234,7 @@ $(document).ready(function () {
             let sub_or = [];
             search_fields.split(",").forEach(function (attr) {
                 sub_or.push({
-                    [attr]: { like: "%" + keyword + "%" },
+                    [attr]: { luke: "%" + keyword + "%" },
                 });
             });
             subquery_and.push(sub_or);
@@ -251,7 +251,7 @@ $(document).ready(function () {
             subquery_and = [];
             extended_sub_or.push({
                 "extended_attributes.type": extended_attributes.split(","),
-                "extended_attributes.value": { like: "%" + keyword + "%" },
+                "extended_attributes.value": { luke: "%" + keyword + "%" },
             });
             subquery_and.push(extended_sub_or);
 

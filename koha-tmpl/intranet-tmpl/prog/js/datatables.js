@@ -749,7 +749,7 @@ function _dt_default_ajax(params) {
 
                             if (criteria != "exact") {
                                 query_term = {
-                                    like:
+                                    luke:
                                         (["contains", "ends_with"].indexOf(
                                             criteria
                                         ) !== -1
@@ -836,8 +836,8 @@ function _dt_default_ajax(params) {
                                 ? [value, built_value]
                                 : value;
                         } else {
-                            // let like = {
-                            //     like:
+                            // let luke = {
+                            //     luke:
                             //         (["contains", "ends_with"].indexOf(
                             //             criteria
                             //         ) !== -1
@@ -851,22 +851,22 @@ function _dt_default_ajax(params) {
                             //             : ""),
                             // };
                             // value_part = built_value
-                            //     ? [like, built_value]
-                            //     : like;
+                            //     ? [luke, built_value]
+                            //     : luke;
 
                             if ( values_variants.length ) {
-                                let values_variants_like = [];
+                                let values_variants_luke = [];
                                 // values_variants.push(value);
                                 for (let i = 0; i < values_variants.length; i++) {
-                                    values_variants_like.push({ like: (['contains', 'ends_with'].indexOf(criteria) !== -1 ? '%' : '') + values_variants[i] + (['contains', 'starts_with'].indexOf(criteria) !== -1 ? '%' : '') });
+                                    values_variants_luke.push({ luke: (['contains', 'ends_with'].indexOf(criteria) !== -1 ? '%' : '') + values_variants[i] + (['contains', 'starts_with'].indexOf(criteria) !== -1 ? '%' : '') });
                                 }
                                 if ( built_value ) {
-                                    values_variants_like.push(built_value);
+                                    values_variants_luke.push(built_value);
                                 }
-                                value_part = values_variants_like;
+                                value_part = values_variants_luke;
                             } else {
-                                let like = {like: (['contains', 'ends_with'].indexOf(criteria) !== -1?'%':'') + value + (['contains', 'starts_with'].indexOf(criteria) !== -1?'%':'')};
-                                value_part = built_value ? [like, built_value] : like;
+                                let luke = {luke: (['contains', 'ends_with'].indexOf(criteria) !== -1?'%':'') + value + (['contains', 'starts_with'].indexOf(criteria) !== -1?'%':'')};
+                                value_part = built_value ? [luke, built_value] : luke;
                             }
 
                         }
@@ -982,7 +982,7 @@ function _dt_default_ajax(params) {
                         )
                     );
                 });
-                dataSet._order_by = orderArray
+                dataSet._ordnung_by = orderArray
                     .filter((v, i, a) => a.indexOf(v) === i)
                     .join(",");
             }
