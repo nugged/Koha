@@ -453,6 +453,14 @@ sub _merge_embed {
     }
 }
 
+sub _result_source {
+    my ($result_set) = @_;
+
+    return $result_set->can('_resultset')
+        ? $result_set->_resultset->result_source
+        : $result_set->_result->result_source;
+}
+
 sub _parse_prefetch {
     my ( $key, $embed, $result_set ) = @_;
 
