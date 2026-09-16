@@ -373,6 +373,9 @@ if ($patron_disclosure_enabled) {
             communications
             security_administration
         );
+        push @disclosure_classes,
+            @{ Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $logged_in_user } ) },
+            @{ Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $logged_in_user } ) };
         push @disclosure_classes, 'documents_media'
             if C4::Context->preference('patronimages') || C4::Context->preference('EnableBorrowerFiles');
         push @disclosure_classes, 'extended_attributes' if C4::Context->preference('ExtendedPatronAttributes');

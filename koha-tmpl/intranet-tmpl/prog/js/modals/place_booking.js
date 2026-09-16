@@ -32,12 +32,18 @@ function toInt(value) {
     return isNaN(parsed) ? 0 : parsed;
 }
 
-async function fetchAllKohaApiPages(endpoint, headers = {}) {
+async function fetchAllKohaApiPages(endpoint, resourceKey, headers = {}) {
+    // Bound complete-set calculations independently of each API page's limit.
+    const maxRecords = 10000;
+    const maxPages = 1000;
     const records = [];
     const url = new URL(endpoint, window.location.origin);
     url.searchParams.delete("_per_page");
+    url.searchParams.set("_order_by", resourceKey);
+    let expectedTotal;
+    let previousId = 0;
 
-    for (let page = 1; ; page++) {
+    for (let page = 1; page <= maxPages; page++) {
         url.searchParams.set("_page", page);
         const response = await fetch(url, { headers });
         if (!response.ok) {
@@ -49,16 +55,41 @@ async function fetchAllKohaApiPages(endpoint, headers = {}) {
             throw new Error("Expected a paginated API response");
         }
 
-        records.push(...pageRecords);
         const totalHeader = response.headers.get("X-Total-Count");
-        const total = totalHeader === null ? undefined : Number(totalHeader);
+        const total = Number(totalHeader);
         if (
-            pageRecords.length === 0 ||
-            (Number.isInteger(total) && total >= 0 && records.length >= total)
+            totalHeader === null ||
+            !/^\d+$/.test(totalHeader) ||
+            !Number.isSafeInteger(total) ||
+            total > maxRecords
         ) {
+            throw new Error("Invalid or excessive API result count");
+        }
+        expectedTotal ??= total;
+        if (total !== expectedTotal) {
+            throw new Error("API result count changed during pagination");
+        }
+        if (
+            records.length + pageRecords.length > total ||
+            (pageRecords.length === 0 && records.length < total)
+        ) {
+            throw new Error("Incomplete or inconsistent API pagination");
+        }
+        for (const record of pageRecords) {
+            const id = record?.[resourceKey];
+            if (!Number.isSafeInteger(id) || id <= previousId) {
+                throw new Error(
+                    "API pagination did not advance in resource order"
+                );
+            }
+            previousId = id;
+            records.push(record);
+        }
+        if (records.length === total) {
             return records;
         }
     }
+    throw new Error("API pagination exceeded the page limit");
 }
 
 /**
@@ -431,11 +462,12 @@ $("#placeBookingModal").on("show.bs.modal", function (e) {
     let periodPicker = $("#period").get(0)._flatpickr;
 
     if (!dataFetched) {
+        $("#booking_result").empty().removeClass("alert alert-danger");
+        $("#placeBookingForm button[type='submit']").prop("disabled", true);
         // Fetch list of bookable items
         const itemsFetch = fetchAllKohaApiPages(
-            "/api/v1/biblios/" +
-                biblionumber +
-                "/items?bookable=1",
+            "/api/v1/biblios/" + biblionumber + "/items?bookable=1",
+            "item_id",
             {
                 "x-koha-embed": "item_type",
             }
@@ -446,11 +478,13 @@ $("#placeBookingModal").on("show.bs.modal", function (e) {
             "/api/v1/bookings?biblio_id=" +
                 biblionumber +
                 '&q={"status":{"-in":["new","pending","active"]}}',
+            "booking_id"
         );
 
         // Fetch list of current checkouts
         const checkoutsFetch = fetchAllKohaApiPages(
-            "/api/v1/biblios/" + biblionumber + "/checkouts"
+            "/api/v1/biblios/" + biblionumber + "/checkouts",
+            "checkout_id"
         );
 
         // Update item select2 and period flatpickr
@@ -2141,6 +2175,10 @@ $("#placeBookingModal").on("show.bs.modal", function (e) {
 
                 // Set the flag to indicate that data has been fetched
                 dataFetched = true;
+                $("#placeBookingForm button[type='submit']").prop(
+                    "disabled",
+                    false
+                );
 
                 // Set form values
                 setFormValues(
@@ -2154,6 +2192,11 @@ $("#placeBookingModal").on("show.bs.modal", function (e) {
             },
             function (error) {
                 console.error("Fetch failed", error);
+                showBookingError(
+                    __(
+                        "Unable to load complete booking availability. Close the window and try again."
+                    )
+                );
             }
         );
     } else {
@@ -2346,6 +2389,13 @@ function refreshBookingsTable() {
 
 $("#placeBookingForm").on("submit", function (e) {
     e.preventDefault();
+
+    if (!dataFetched) {
+        showBookingError(
+            __("Complete booking availability has not been loaded.")
+        );
+        return;
+    }
 
     const url = "/api/v1/bookings";
     const start_date = $("#booking_start_date").val();

@@ -52,7 +52,12 @@ $template->param(
 
 my $extra_options;
 if ( Koha::Patron::Disclosure->enabled ) {
-    my @data_classes = ( @{ Koha::Patron::Disclosure->staff_sidebar_data_classes }, 'circulation_history' );
+    my $logged_in_user = Koha::Patrons->find($loggedinuser);
+    my @data_classes   = (
+        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $logged_in_user } ) },
+        @{ Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $logged_in_user } ) },
+        'circulation_history'
+    );
     $extra_options = {
         patron_disclosure => {
             surface  => 'patrons.holds.history',

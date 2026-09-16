@@ -65,6 +65,7 @@ if ( $op eq 'cud-resend_notice' ) {
 
         # redirect to self to avoid form submission on refresh
         print $input->redirect("/cgi-bin/koha/members/notices.pl?borrowernumber=$borrowernumber");
+        exit;
     }
 }
 
@@ -122,6 +123,7 @@ if ( $op eq 'send_welcome' ) {
 
     # redirect to self to avoid form submission on refresh
     print $input->redirect("/cgi-bin/koha/members/notices.pl?borrowernumber=$borrowernumber");
+    exit;
 }
 
 if ( $op eq 'send_password_reset' ) {
@@ -136,6 +138,7 @@ if ( $op eq 'send_password_reset' ) {
 
     # redirect to self to avoid form submission on refresh
     print $input->redirect("/cgi-bin/koha/members/notices.pl?borrowernumber=$borrowernumber");
+    exit;
 }
 
 # Getting the messages
@@ -148,10 +151,13 @@ $template->param(
     sentnotices     => 1,
 );
 
-my $is_mutating_op = $op =~ /\Acud-/ || $op eq 'send_welcome' || $op eq 'send_password_reset';
 my $extra_options;
-if ( Koha::Patron::Disclosure->enabled && !$is_mutating_op ) {
-    my @data_classes = ( @{ Koha::Patron::Disclosure->staff_sidebar_data_classes }, 'communications' );
+if ( Koha::Patron::Disclosure->enabled ) {
+    my @data_classes = (
+        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $logged_in_user } ) },
+        @{ Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $logged_in_user } ) },
+        'communications'
+    );
     $extra_options = {
         patron_disclosure => {
             surface  => 'patrons.notices.list',

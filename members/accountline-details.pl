@@ -91,7 +91,8 @@ if ( $disclosure_enabled && $patron ) {
     my %classes_by_patron = (
         $patron->id => {
             map { $_ => 1 } (
-                @{ Koha::Patron::Disclosure->staff_sidebar_data_classes },
+                @{ Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $logged_in_user } ) },
+                @{ Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $logged_in_user } ) },
                 qw( circulation_current circulation_history financial )
             )
         },

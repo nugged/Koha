@@ -60,6 +60,22 @@ use Koha::Patron::Disclosure;
     }
 }
 
+{
+
+    package Test::Output::LoggedInUser;
+
+    sub new {
+        my ( $class, @permissions ) = @_;
+        return bless { permissions => { map { $_ => 1 } @permissions } }, $class;
+    }
+
+    sub has_permission {
+        my ( $self, $required ) = @_;
+        my ($permission) = keys %{$required};
+        return $self->{permissions}->{ $permission . ':' . $required->{$permission} } ? 1 : 0;
+    }
+}
+
 my $enabled   = 1;
 my $fail_next = 0;
 my @events;
@@ -169,6 +185,62 @@ subtest 'staff sidebar classes follow its disclosure preferences' => sub {
     );
 
     %preferences = ();
+};
+
+subtest 'staff component contributors follow rendered permission and preference branches' => sub {
+    plan tests => 6;
+
+    %preferences = ();
+    my $serials_user = Test::Output::LoggedInUser->new('serials:*');
+    is_deeply(
+        Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $serials_user } ),
+        [qw( communications contact identity notes_restrictions profile security_administration )],
+        'serials permission adds the alert-subscription state represented by the sidebar'
+    );
+
+    my $no_permissions = Test::Output::LoggedInUser->new;
+    is_deeply(
+        Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $no_permissions } ),
+        ['identity'],
+        'a toolbar without conditional permissions represents only its patron identity'
+    );
+
+    my $editor = Test::Output::LoggedInUser->new(
+        'borrowers:edit_borrowers',
+        'borrowers:delete_borrowers',
+    );
+    is_deeply(
+        Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $editor } ),
+        [qw( communications identity notes_restrictions profile security_administration )],
+        'edit and delete controls represent messaging, patron state, and protection state'
+    );
+
+    my $circulator = Test::Output::LoggedInUser->new('circulate:circulate_remaining_permissions');
+    is_deeply(
+        Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $circulator } ),
+        [qw( circulation_current financial identity profile )],
+        'circulation controls represent overdues, balance, privacy, and identity state'
+    );
+
+    $preferences{CurbsidePickup} = 1;
+    is_deeply(
+        Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $no_permissions } ),
+        ['identity'],
+        'the static curbside scheduling link does not disclose service-activity state'
+    );
+
+    %preferences = ();
+    my %sidebar_and_toolbar = map { $_ => 1 } (
+        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $serials_user } ) },
+        @{ Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $circulator } ) },
+    );
+    is_deeply(
+        [ sort keys %sidebar_and_toolbar ],
+        [
+            qw( circulation_current communications contact financial identity notes_restrictions profile security_administration )
+        ],
+        'a page unions sidebar and toolbar contributors without assigning toolbar-only classes to the sidebar'
+    );
 };
 
 subtest 'the buffered response is printed only after audit commit' => sub {

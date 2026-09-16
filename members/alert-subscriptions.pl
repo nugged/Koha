@@ -52,6 +52,7 @@ if ( $op eq 'cud-unsubscribe' ) {
     my $subscription    = Koha::Subscriptions->find($subscription_id);
     $subscription->remove_subscriber($patron);
     print $input->redirect( "/cgi-bin/koha/members/alert-subscriptions.pl?borrowernumber=" . $borrowernumber );
+    exit;
 }
 
 $template->param(
@@ -60,8 +61,12 @@ $template->param(
 );
 
 my $extra_options;
-if ( Koha::Patron::Disclosure->enabled && $op !~ /\Acud-/ ) {
-    my @data_classes = ( @{ Koha::Patron::Disclosure->staff_sidebar_data_classes }, 'communications' );
+if ( Koha::Patron::Disclosure->enabled ) {
+    my @data_classes = (
+        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $logged_in_user } ) },
+        @{ Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $logged_in_user } ) },
+        'communications'
+    );
     $extra_options = {
         patron_disclosure => {
             surface  => 'patrons.alerts.list',

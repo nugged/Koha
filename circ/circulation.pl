@@ -514,13 +514,13 @@ if ( @$barcodes && $op eq 'cud-checkout' ) {
                     my $patron_id  = $logged_in_user->borrowernumber;
                     my $resolution = $autoClaimReturnCheckout;
 
-                    $circulation_state_changed = 1;
                     $claim->resolve(
                         {
                             resolution  => $resolution,
                             resolved_by => $patron_id,
                         }
                     );
+                    $circulation_state_changed = 1;
                     $template_params->{CLAIM_RESOLUTION} = $claim;
                 }
             }
@@ -612,7 +612,6 @@ if ( @$barcodes && $op eq 'cud-checkout' ) {
                     }
                 }
                 $needsconfirmation->{'DEBT'} = $needsconfirmationDEBT if ($debt_confirmed);
-                $circulation_state_changed = 1;
                 my $issue = AddIssue(
                     $patron, $barcode, $datedue,
                     $cancelreserve,
@@ -628,6 +627,7 @@ if ( @$barcodes && $op eq 'cud-checkout' ) {
                         forced                 => [ keys %{$issuingimpossible} ]
                     }
                 );
+                $circulation_state_changed = 1 if $issue;
                 $template_params->{issue} = $issue;
                 $session->clear('auto_renew');
                 $inprocess = 1;
@@ -942,7 +942,8 @@ $template->param(
 my $extra_options;
 if ( $patron_disclosure_enabled && $patron && !$circulation_state_changed ) {
     my @target_classes = (
-        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes },
+        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $logged_in_user } ) },
+        @{ Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $logged_in_user } ) },
         qw( circulation_current financial communications )
     );
     push @target_classes, 'service_activity' if C4::Context->preference('CurbsidePickup');

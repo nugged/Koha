@@ -89,23 +89,30 @@ my $op = $input->param('op') // q{};
 if ( $op eq 'cud-paycollect' ) {
     print $input->redirect(
         "/cgi-bin/koha/members/paycollect.pl?borrowernumber=$borrowernumber&change_given=$change_given");
+    exit;
 } elsif ( $op eq 'cud-payselected' ) {
     payselected( { params => \@names } );
+    exit;
 } elsif ( $op eq 'cud-writeoff_selected' ) {
     payselected( { params => \@names, type => 'WRITEOFF' } );
+    exit;
 } elsif ( $op eq 'cud-woall' ) {
     writeoff_all(@names);
+    exit;
 } elsif ( $op eq 'cud-apply_credits' ) {
     apply_credits( { patron => $patron, cgi => $input } );
+    exit;
 }
 
 for (@names) {
     if ( $op =~ /^cud-pay_indiv_(\d+)$/ ) {
         my $line_no = $1;
         redirect_to_paycollect( 'pay_individual', $line_no );
+        exit;
     } elsif ( $op =~ /^cud-wo_indiv_(\d+)$/ ) {
         my $line_no = $1;
         redirect_to_paycollect( 'writeoff_individual', $line_no );
+        exit;
     }
 }
 
@@ -135,9 +142,10 @@ $template->param(
 add_accounts_to_template();
 
 my $extra_options;
-if ( Koha::Patron::Disclosure->enabled && $op !~ /^cud-/ ) {
+if ( Koha::Patron::Disclosure->enabled ) {
     my @data_classes = (
-        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes },
+        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $logged_in_user } ) },
+        @{ Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $logged_in_user } ) },
         qw( circulation_current circulation_history financial )
     );
     $extra_options = {

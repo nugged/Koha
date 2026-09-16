@@ -88,10 +88,12 @@
     <script nonce="[% Koha.CSPNonce | $raw %]">
         $(document).ready(function () {
             var items = fetchAllKohaApiPages(
-                "/api/v1/biblios/%s/items?bookable=1".format(biblionumber)
+                "/api/v1/biblios/%s/items?bookable=1".format(biblionumber),
+                "item_id"
             );
             var bookings = fetchAllKohaApiPages(
                 "/api/v1/biblios/%s/bookings".format(biblionumber),
+                "booking_id",
                 { "x-koha-embed": "patron" }
             );
 
@@ -227,6 +229,11 @@
                 },
                 function (error) {
                     console.error("Fetch failed", error);
+                    $("#bookings-timeline").empty().append(
+                        $("<div>", { class: "alert alert-danger", role: "alert" }).text(
+                            _("Unable to load the complete booking timeline. Reload the page to try again.")
+                        )
+                    );
                 }
             );
 

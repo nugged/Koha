@@ -62,7 +62,11 @@ $template->param(
 
 my $extra_options;
 if ( Koha::Patron::Disclosure->enabled ) {
-    my @data_classes = ( @{ Koha::Patron::Disclosure->staff_sidebar_data_classes }, 'service_activity' );
+    my @data_classes = (
+        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $logged_in_user } ) },
+        @{ Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $logged_in_user } ) },
+        'service_activity'
+    );
     $extra_options = {
         patron_disclosure => {
             surface  => 'patrons.routing_lists.list',

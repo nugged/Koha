@@ -65,7 +65,13 @@ $template->param( suggestions => $suggestions );
 my $extra_options;
 if ( Koha::Patron::Disclosure->enabled ) {
     my %subjects = ( $patron->id =>
-            { map { $_ => 1 } ( @{ Koha::Patron::Disclosure->staff_sidebar_data_classes }, 'service_activity' ) } );
+            {
+                map { $_ => 1 } (
+                    @{ Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $logged_in_user } ) },
+                    @{ Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $logged_in_user } ) },
+                    'service_activity'
+                )
+            } );
     for my $suggestion ( @{$suggestions} ) {
         my $manager = $suggestion->manager;
         $subjects{ $manager->id }->{identity} = 1 if $manager;

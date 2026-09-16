@@ -129,20 +129,16 @@ $template->param( restriction_types => scalar Koha::Patron::Restriction::Types->
 my $patron_state_changed;
 my @debarments_to_remove = $input->multi_param('remove_debarment');
 foreach my $d (@debarments_to_remove) {
-    $patron_state_changed = 1;
-    DelDebarment($d);
+    $patron_state_changed = 1 if DelDebarment($d);
 }
 if ( $input->param('add_debarment') ) {
-
-    $patron_state_changed = 1;
-
     my $expiration = $input->param('debarred_expiration');
     $expiration =
         $expiration
         ? dt_from_string($expiration)->ymd
         : undef;
 
-    AddDebarment(
+    $patron_state_changed = 1 if AddDebarment(
         {
             borrowernumber => $borrowernumber,
             type           => scalar $input->param('debarred_type') // 'MANUAL',
@@ -273,7 +269,6 @@ if ( ( $op eq 'cud-insert' ) and !$nodouble ) {
 #Attempt to delete guarantors
 my @delete_guarantor = $input->multi_param('delete_guarantor');
 if (@delete_guarantor) {
-    $patron_state_changed = 1;
     my $will_remove_last =
            ( scalar @guarantors - scalar @delete_guarantor == 0 )
         && $newdata{'contactname'} eq q{}
@@ -286,6 +281,7 @@ if (@delete_guarantor) {
             my $r = Koha::Patron::Relationships->find($id);
             if ($r) {
                 $r->delete();
+                $patron_state_changed = 1;
                 push @deleted_guarantors, $id;
             }
         }
@@ -1011,7 +1007,8 @@ if ( $patron_disclosure_enabled && $check_patron && !$patron_state_changed && $r
         7 => [qw( identity service_activity )],
     );
     my @displayed_steps = $step ? ($step) : sort { $a <=> $b } keys %classes_by_step;
-    my %target_classes  = map                    { $_ => 1 } @{ Koha::Patron::Disclosure->staff_sidebar_data_classes };
+    my %target_classes = map { $_ => 1 }
+        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $logged_in_user } ) };
     $target_classes{identity} = 1;
     $target_classes{$_} = 1 for map { @{ $classes_by_step{$_} // [] } } @displayed_steps;
     my @subjects = (
@@ -1064,6 +1061,26 @@ if ( $patron_disclosure_enabled && $check_patron && !$patron_state_changed && $r
     $extra_options = {
         patron_disclosure => {
             surface  => 'patrons.record.create_form',
+            subjects => \@subjects,
+        }
+    };
+} elsif ( $patron_disclosure_enabled && $patron && !$patron_state_changed ) {
+    my @subjects = (
+        {
+            patron_id => $patron->id,
+            data_classes =>
+                Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $logged_in_user } ),
+        },
+        map {
+            {
+                patron_id    => $_,
+                data_classes => ['identity'],
+            }
+        } sort { $a <=> $b } keys %displayed_related_patron_ids
+    );
+    $extra_options = {
+        patron_disclosure => {
+            surface  => 'patrons.record.edit',
             subjects => \@subjects,
         }
     };

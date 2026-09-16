@@ -235,6 +235,117 @@ for my $file ( sort keys %expected_cgi ) {
     }
 }
 
+my %cgi_with_members_toolbar = map { $_ => 1 } qw(
+    circ/circulation.pl
+    members/accountline-details.pl
+    members/alert-subscriptions.pl
+    members/boraccount.pl
+    members/holdshistory.pl
+    members/moremember.pl
+    members/notices.pl
+    members/pay.pl
+    members/purchase-suggestions.pl
+    members/readingrec.pl
+    members/recallshistory.pl
+    members/routing-lists.pl
+    members/statistics.pl
+);
+
+for my $file ( sort keys %cgi_with_members_toolbar ) {
+    open my $fh, '<', "$root/$file" or die "Cannot read $file: $!";
+    local $/;
+    my $source = <$fh>;
+    close $fh;
+    like(
+        $source,
+        qr/staff_toolbar_data_classes\(\s*\{\s*logged_in_user\s*=>\s*\$logged_in_user\s*\}\s*\)/,
+        "$file unions the rendered members-toolbar contributor"
+    );
+}
+
+open my $memberentry_fh, '<', "$root/members/memberentry.pl" or die "Cannot read members/memberentry.pl: $!";
+local $/;
+my $memberentry_source = <$memberentry_fh>;
+close $memberentry_fh;
+unlike(
+    $memberentry_source,
+    qr/staff_toolbar_data_classes/,
+    'the member-entry page does not acquire toolbar-only classes when it renders only the patron sidebar'
+);
+like(
+    $memberentry_source,
+    qr/\$patron_state_changed\s*=\s*1\s+if\s+DelDebarment/,
+    'a missing debarment is not treated as a successful mutation'
+);
+like(
+    $memberentry_source,
+    qr/\$patron_state_changed\s*=\s*1\s+if\s+AddDebarment/,
+    'a debarment add is marked only after the helper reports an effect'
+);
+like(
+    $memberentry_source,
+    qr/\$r->delete\(\);\s*\$patron_state_changed\s*=\s*1/s,
+    'a guarantor relationship delete is marked only after a relationship was found and deleted'
+);
+like(
+    $memberentry_source,
+    qr/elsif\s*\(\s*\$patron_disclosure_enabled\s*&&\s*\$patron\s*&&\s*!\$patron_state_changed\s*\).*?'patrons\.record\.edit'/s,
+    'an unknown or no-op member-entry operation falls back to an audited patron render'
+);
+
+for my $file (qw( members/alert-subscriptions.pl members/boraccount.pl members/notices.pl members/pay.pl )) {
+    open my $fh, '<', "$root/$file" or die "Cannot read $file: $!";
+    local $/;
+    my $source = <$fh>;
+    close $fh;
+    unlike(
+        $source,
+        qr/Koha::Patron::Disclosure->enabled\s*&&[^\n]*(?:cud-|is_mutating_op)/,
+        "$file does not suppress the descriptor for arbitrary cud-prefixed operations"
+    );
+}
+
+open my $boraccount_fh, '<', "$root/members/boraccount.pl" or die "Cannot read members/boraccount.pl: $!";
+local $/;
+my $boraccount_source = <$boraccount_fh>;
+close $boraccount_fh;
+like(
+    $boraccount_source,
+    qr/Koha::Patron::Disclosure->enabled\s*&&\s*!\$patron_state_changed/,
+    'actual financial mutations retain their retry-safe disclosure exclusion'
+);
+like(
+    $boraccount_source,
+    qr/\$receipt_sent\s*=\s*\$message_id\s*\?\s*1\s*:\s*-1;\s*\$patron_state_changed\s*=\s*1\s+if\s+\$message_id/s,
+    'a failed receipt send remains an audited patron render'
+);
+like(
+    $boraccount_source,
+    qr/\$payment->set\(\s*\{\s*note\s*=>\s*\$note\s*\}\s*\);\s*my\s+%dirty_columns\s*=\s*\$payment->_result->get_dirty_columns;\s*\$note_changed\s*=\s*exists\s+\$dirty_columns\{note\};\s*\$payment->store\(\);.*?\$patron_state_changed\s*=\s*1\s+if\s+\$note_changed/s,
+    'an identical account-note request remains audited while a dirty note retains the mutation exclusion'
+);
+
+like(
+    $memberentry_source,
+    qr/\$patron_disclosure_enabled\s*&&\s*\$patron\s*&&\s*!\$patron_state_changed/,
+    'actual member-entry mutations retain their retry-safe disclosure exclusion'
+);
+
+open my $circulation_fh, '<', "$root/circ/circulation.pl" or die "Cannot read circ/circulation.pl: $!";
+local $/;
+my $circulation_source = <$circulation_fh>;
+close $circulation_fh;
+like(
+    $circulation_source,
+    qr/\$patron_disclosure_enabled\s*&&\s*\$patron\s*&&\s*!\$circulation_state_changed/,
+    'actual circulation mutations retain their retry-safe disclosure exclusion'
+);
+like(
+    $circulation_source,
+    qr/my\s+\$issue\s*=\s*AddIssue\(.*?\);\s*\$circulation_state_changed\s*=\s*1\s+if\s+\$issue;/s,
+    'a failed checkout remains an audited patron render'
+);
+
 my %expected_svc = (
     'svc/checkouts'     => [qw( patrons.checkouts.current patrons.checkouts.current_batch )],
     'svc/holds'         => ['patrons.holds.list'],
@@ -274,6 +385,54 @@ for my $file ( sort keys %expected_svc ) {
     for my $surface ( @{ $expected_svc{$file} } ) {
         like( $source, qr/'\Q$surface\E'/, "$file declares stable surface $surface" );
     }
+
+    my $resolver_name = $file eq 'svc/checkouts' ? 'resolve_patron_ids' : 'resolve_single_patron_id';
+    my $resolver_position = index( $source, $resolver_name );
+    my $activity_position =
+          $file eq 'svc/holds'
+        ? index( $source, 'Koha::Holds->search' )
+        : index( $source, '$dbh->prepare($sql)' );
+    ok( $resolver_position >= 0, "$file resolves real patron subjects" );
+    ok(
+        $activity_position >= 0 && $resolver_position < $activity_position,
+        "$file bounds and resolves subjects before its patron activity query"
+    );
+    if ( $file eq 'svc/checkouts' ) {
+        like(
+            $source,
+            qr/my\s+\@subjects\s*=\s*map\s*\{.*?patron_id\s*=>\s*\$_.*?\}\s*\@disclosure_patron_ids;.*?patron_disclosure\s*=>\s*\{.*?subjects\s*=>\s*\\\@subjects/s,
+            "$file maps every resolved patron ID into the descriptor subject list"
+        );
+    } elsif ( $file eq 'svc/holds' ) {
+        like(
+            $source,
+            qr/patron_disclosure\s*=>\s*\{.*?subjects\s*=>\s*\[\s*\{\s*patron_id\s*=>\s*\$disclosure_patron_ids\[0\]/s,
+            "$file uses its resolved single patron ID directly in the descriptor"
+        );
+    } else {
+        like(
+            $source,
+            qr/my\s+\@subjects\s*=\s*\(\s*\{\s*patron_id\s*=>\s*\$disclosure_patron_ids\[0\].*?patron_disclosure\s*=>\s*\{.*?subjects\s*=>\s*\\\@subjects/s,
+            "$file starts its descriptor subject list with the resolved request patron ID"
+        );
+    }
+    if ( $file ne 'svc/checkouts' ) {
+        like(
+            $source,
+            qr/my\s+\@raw_borrowernumbers\s*=\s*\$input->multi_param\(\s*'borrowernumber'\s*\);.*?resolve_single_patron_id\(\s*\\\@raw_borrowernumbers\s*\)/s,
+            "$file validates the complete raw parameter list as exactly one patron target"
+        );
+    }
+    like(
+        $source,
+        qr/ref\(\$_\)\s+eq\s+'Koha::Exceptions::BadParameter'.*?patron_disclosure_subjects.*?'400 Bad Request'.*?'patron_disclosure_invalid_subjects'/s,
+        "$file maps typed subject-input failures to the closed HTTP 400 response"
+    );
+    like(
+        $source,
+        qr/'503 Service Unavailable'.*?'patron_disclosure_subject_resolution_unavailable'/s,
+        "$file maps operational subject-resolution failures to the closed HTTP 503 response"
+    );
 
     if ( $file eq 'svc/return_claims' ) {
         unlike( $source, qr/resolved_by_data\s*=\s*\$patron->unblessed/, 'resolver output is explicitly allowlisted' );

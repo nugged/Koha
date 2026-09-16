@@ -71,6 +71,7 @@ output_and_exit_if_error(
 );
 
 my $registerid = $input->param('registerid');
+my $patron_state_changed;
 
 if ( $op eq 'cud-void' ) {
     output_and_exit_if_error( $input, $cookie, $template, { check => 'csrf_token' } );
@@ -85,6 +86,7 @@ if ( $op eq 'cud-void' ) {
             note      => $note
         }
     );
+    $patron_state_changed = 1;
 }
 
 if ( $op eq 'cud-payout' ) {
@@ -127,6 +129,7 @@ if ( $op eq 'cud-payout' ) {
             }
         );
     }
+    $patron_state_changed = 1;
 }
 
 if ( $op eq 'cud-refund' ) {
@@ -165,6 +168,7 @@ if ( $op eq 'cud-refund' ) {
             }
         }
     );
+    $patron_state_changed = 1;
 }
 
 if ( $op eq 'cud-discount' ) {
@@ -189,6 +193,7 @@ if ( $op eq 'cud-discount' ) {
             );
         }
     );
+    $patron_state_changed = 1;
 }
 
 my $receipt_sent = 0;
@@ -222,6 +227,7 @@ if ( $op eq 'cud-send_receipt' ) {
         );
         C4::Letters::SendQueuedMessages( { message_id => $message_id } ) if $message_id;
         $receipt_sent = $message_id ? 1 : -1;
+        $patron_state_changed = 1 if $message_id;
     } else {
         $receipt_sent = -1;
     }
@@ -235,13 +241,18 @@ if ( $op eq 'cud-edit_note' ) {
     my $note       = scalar $input->param('edited_note');
 
     my $payment = Koha::Account::Lines->find($payment_id);
+    my $note_changed;
 
     $schema->txn_do(
         sub {
             # Update the note and date in the account line
-            $payment->set( { note => $note } )->store();
+            $payment->set( { note => $note } );
+            my %dirty_columns = $payment->_result->get_dirty_columns;
+            $note_changed = exists $dirty_columns{note};
+            $payment->store();
         }
     );
+    $patron_state_changed = 1 if $note_changed;
 }
 
 #get account details
@@ -286,9 +297,10 @@ $template->param(
 );
 
 my $extra_options;
-if ( Koha::Patron::Disclosure->enabled && $op !~ /\Acud-/ ) {
+if ( Koha::Patron::Disclosure->enabled && !$patron_state_changed ) {
     my @data_classes = (
-        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes },
+        @{ Koha::Patron::Disclosure->staff_sidebar_data_classes( { logged_in_user => $logged_in_user } ) },
+        @{ Koha::Patron::Disclosure->staff_toolbar_data_classes( { logged_in_user => $logged_in_user } ) },
         qw( circulation_current circulation_history financial )
     );
     $extra_options = {

@@ -24,6 +24,7 @@ use Koha::ActionLog;
 use Koha::ActionLogs;
 use Koha::Database;
 use Koha::Patron::Disclosure;
+use Koha::Patrons;
 
 my $schema  = Koha::Database->new->schema;
 my $builder = t::lib::TestBuilder->new;
@@ -235,6 +236,104 @@ subtest 'closed event and subject vocabularies' => sub {
     is( scalar @{ $logger->messages }, 0, 'validation failures emit no logger messages' );
 
     $schema->storage->txn_rollback;
+};
+
+subtest 'request patron IDs are bounded, canonical, deduplicated, and existence-resolved' => sub {
+    $schema->storage->txn_begin;
+    t::lib::Mocks::mock_preference( 'StaffPatronDataDisclosureLog',         1 );
+    t::lib::Mocks::mock_preference( 'StaffPatronDataDisclosureMaxSubjects', 3 );
+
+    my $actor      = $builder->build_object( { class => 'Koha::Patrons' } );
+    my $patron_1   = $builder->build_object( { class => 'Koha::Patrons' } );
+    my $patron_2   = $builder->build_object( { class => 'Koha::Patrons' } );
+    my ($highest_id) = Koha::Patrons->search( {}, { order_by => { -desc => 'borrowernumber' }, rows => 1 } )
+        ->get_column('borrowernumber');
+    my $missing_id = $highest_id + 1000;
+
+    is( $patron_1->checkouts->count, 0, 'the existing no-activity control has no current checkouts' );
+    is_deeply(
+        Koha::Patron::Disclosure->resolve_patron_ids( [ $patron_1->id ] ),
+        [ $patron_1->id ],
+        'an existing patron remains a subject even with no activity rows'
+    );
+    throws_ok { Koha::Patron::Disclosure->resolve_patron_ids( [$missing_id] ) }
+    'Koha::Exceptions::BadParameter',
+        'a nonexistent-only request is rejected';
+    throws_ok {
+        Koha::Patron::Disclosure->resolve_patron_ids( [ $missing_id, $patron_2->id, $patron_1->id ] );
+    }
+    'Koha::Exceptions::BadParameter',
+        'mixed real and nonexistent targets are rejected as one request';
+    is(
+        disclosure_logs()->search( { user => $actor->id } )->count,
+        0,
+        'nonexistent-only and mixed-target rejection create no disclosure event'
+    );
+    is_deeply(
+        Koha::Patron::Disclosure->resolve_patron_ids( [ $patron_2->id, $patron_2->id, $patron_2->id ] ),
+        [ $patron_2->id ],
+        'repeated IDs are deduplicated before subject construction'
+    );
+
+    my $patron_search_calls = 0;
+    my $patron_search       = Koha::Patrons->can('search');
+    my $patrons_mock        = Test::MockModule->new('Koha::Patrons');
+    $patrons_mock->redefine(
+        search => sub {
+            $patron_search_calls++;
+            return $patron_search->(@_);
+        }
+    );
+
+    throws_ok { Koha::Patron::Disclosure->resolve_patron_ids( ['01'] ) }
+    'Koha::Exceptions::BadParameter',
+        'noncanonical syntax is rejected';
+    is( $patron_search_calls, 0, 'invalid syntax is rejected before the existence query' );
+
+    throws_ok { Koha::Patron::Disclosure->resolve_patron_ids( ['2147483648'] ) }
+    'Koha::Exceptions::BadParameter',
+        'an ID outside the signed borrowers integer domain is rejected before numeric coercion';
+    throws_ok { Koha::Patron::Disclosure->resolve_patron_ids( ['9007199254740993'] ) }
+    'Koha::Exceptions::BadParameter',
+        'a precision-losing numeric ID is rejected before numeric coercion';
+    is( $patron_search_calls, 0, 'out-of-domain IDs reach no existence query' );
+
+    t::lib::Mocks::mock_preference( 'StaffPatronDataDisclosureMaxSubjects', 1 );
+    throws_ok { Koha::Patron::Disclosure->resolve_patron_ids( [ $patron_1->id, $patron_2->id ] ) }
+    'Koha::Exceptions::BadParameter',
+        'too many unique subjects are rejected';
+    is( $patron_search_calls, 0, 'the unique-subject limit is enforced before the existence query' );
+
+    throws_ok {
+        Koha::Patron::Disclosure->resolve_patron_ids( [ ( $patron_1->id ) x 5 ] );
+    }
+    'Koha::Exceptions::BadParameter',
+        'too many raw repeated IDs are rejected independently of deduplication';
+    is( $patron_search_calls, 0, 'the raw-input limit is enforced before the existence query' );
+
+    t::lib::Mocks::mock_preference( 'StaffPatronDataDisclosureMaxSubjects', 3 );
+    my $resolved_ids =
+        Koha::Patron::Disclosure->resolve_patron_ids( [ $patron_2->id, $patron_1->id, $patron_1->id ] );
+    my $event = new_event(
+        actor_id => $actor->id,
+        surface  => 'patrons.checkouts.current_batch',
+        breadth  => 'workflow_batch',
+    );
+    $event->add_subject(
+        {
+            patron_id    => $_,
+            data_classes => [qw( identity circulation_current )],
+        }
+    ) for @{$resolved_ids};
+    $event->commit;
+    is_deeply(
+        [ map { 0 + $_->object } disclosure_logs()->search( { user => $actor->id } )->as_list ],
+        [ sort { $a <=> $b } ( $patron_1->id, $patron_2->id ) ],
+        'event metadata contains only real deduplicated patron subjects'
+    );
+
+    $schema->storage->txn_rollback;
+    done_testing;
 };
 
 subtest 'supported non-Patron API references add exact patron subjects' => sub {
