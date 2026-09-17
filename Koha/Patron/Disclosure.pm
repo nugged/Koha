@@ -284,13 +284,14 @@ sub new {
 
     $params //= {};
     _assert_hashref( $params, 'event parameters' );
-    _assert_known_keys( $params, [qw( actor_id surface breadth auth_source interface )], 'event parameters' );
+    _assert_known_keys( $params, [qw( actor_id surface breadth auth_source interface api_client_id )], 'event parameters' );
 
-    my $actor_id    = _positive_integer( $params->{actor_id}, 'actor_id' );
-    my $surface     = $params->{surface}     // q{};
-    my $breadth     = $params->{breadth}     // q{};
-    my $auth_source = $params->{auth_source} // q{};
-    my $interface   = $params->{interface}   // q{};
+    my $actor_id     = _positive_integer( $params->{actor_id}, 'actor_id' );
+    my $surface      = $params->{surface}      // q{};
+    my $breadth      = $params->{breadth}      // q{};
+    my $auth_source  = $params->{auth_source}  // q{};
+    my $interface    = $params->{interface}    // q{};
+    my $api_client_id = $params->{api_client_id};
 
     croak "Unknown patron disclosure surface '$surface'" unless exists $SURFACES{$surface};
     croak "Unknown patron disclosure breadth '$breadth'" unless $BREADTHS{$breadth};
@@ -299,14 +300,23 @@ sub new {
     croak "Unknown patron disclosure authentication source '$auth_source'"
         unless $AUTH_SOURCES{$auth_source};
     croak "Unknown patron disclosure interface '$interface'" unless $INTERFACES{$interface};
+    if ( defined $api_client_id ) {
+        croak 'api_client_id must be a non-empty string of at most 191 characters'
+            if ref($api_client_id) || !length($api_client_id) || length($api_client_id) > 191;
+        croak 'api_client_id is only valid for OAuth authentication'
+            unless $auth_source eq 'oauth';
+    } elsif ( $auth_source eq 'oauth' ) {
+        croak 'OAuth patron disclosure events require api_client_id';
+    }
 
     return bless {
-        actor_id    => $actor_id,
-        surface     => $surface,
-        breadth     => $breadth,
-        auth_source => $auth_source,
-        interface   => $interface,
-        subjects    => {},
+        actor_id      => $actor_id,
+        surface       => $surface,
+        breadth       => $breadth,
+        auth_source   => $auth_source,
+        interface     => $interface,
+        api_client_id => $api_client_id,
+        subjects      => {},
     }, $class;
 }
 
@@ -617,16 +627,18 @@ sub commit {
     $schema->txn_do(
         sub {
             for my $patron_id ( sort { $a <=> $b } keys %{ $self->{subjects} } ) {
-                my $info = _encode_json(
-                    {
-                        v            => 1,
-                        event_id     => $event_id,
-                        surface      => $self->{surface},
-                        breadth      => $self->{breadth},
-                        data_classes => [ sort keys %{ $self->{subjects}->{$patron_id} } ],
-                        auth_source  => $self->{auth_source},
-                    }
-                );
+                my $payload = {
+                    v            => 1,
+                    event_id     => $event_id,
+                    surface      => $self->{surface},
+                    breadth      => $self->{breadth},
+                    data_classes => [ sort keys %{ $self->{subjects}->{$patron_id} } ],
+                    auth_source  => $self->{auth_source},
+                };
+                $payload->{api_client_id} = $self->{api_client_id}
+                    if defined $self->{api_client_id};
+
+                my $info = _encode_json($payload);
 
                 Koha::ActionLog->new(
                     {

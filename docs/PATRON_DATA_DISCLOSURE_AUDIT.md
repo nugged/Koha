@@ -2,9 +2,9 @@
 
 ## Purpose
 
-This document defines the implementation contract for Bug 25673. The feature records which authenticated staff account caused Koha to disclose personal data attributable to which patron records.
+This document defines the implementation contract for Bug 25673. The feature records which authenticated Koha principal caused Koha to disclose personal data attributable to which patron records, and identifies the OAuth API client when the request used client credentials.
 
-The event is a server-side disclosure event. It does not prove that a human looked at the response, that the authorization policy was correct, that every response byte reached the client, or why the staff account requested the data.
+The event is a server-side disclosure event. It does not prove that a human looked at the response, that the authorization policy was correct, that every response byte reached the client, why the authenticated principal or API client requested the data, or what an external recipient did with it downstream.
 
 The existing action log does not provide this audit trail. Existing patron, circulation, authentication, and API-key modules primarily record mutations. The action-log viewer and API make existing rows easier to inspect, but do not create patron disclosure events. Report execution logging also does not identify the patrons returned by arbitrary SQL.
 
@@ -45,13 +45,14 @@ When a covered response displays a financial aggregate derived from a guarantor 
   "surface": "patrons.search.results",
   "breadth": "list_page",
   "data_classes": ["contact", "identity", "profile"],
-  "auth_source": "session"
+  "auth_source": "oauth",
+  "api_client_id": "2bd80ec7-e0c2-41d4-b74e-cf4709a46172"
 }
 ```
 
-`auth_source` records only the mechanism that authenticated the request (`session`, `basic`, or `oauth`). It must never decide whether a covered operation is logged and must not be interpreted as proof of human or automated use.
+`auth_source` records only the mechanism that authenticated the request (`session`, `basic`, or `oauth`). For OAuth client-credentials requests, `api_client_id` records the exact validated `api_keys.client_id`; it is omitted for session and Basic authentication. The typed `user` column remains the Koha patron or service account that owns the key. The audit never copies the API secret or mutable key description. This identifies the technical recipient, not a downstream human or the recipient's later use of the data.
 
-The payload must not contain names, card numbers, addresses, contact values, search terms, raw URLs, request parameters, IP addresses, result rows, actor IDs, target IDs, timestamps, counts, or client-supplied request IDs. Actor, target, time, and interface already have typed action-log columns. Repeated requests are separate evidence and are never deduplicated across requests.
+The payload must not contain names, card numbers, addresses, contact values, search terms, raw URLs, request parameters, IP addresses, result rows, actor IDs, target IDs, timestamps, counts, API secrets, mutable API-client descriptions, or client-supplied request IDs. Actor, target, time, and interface already have typed action-log columns. Repeated requests are separate evidence and are never deduplicated across requests.
 
 ## Stable vocabulary
 
@@ -191,7 +192,8 @@ SELECT action_id,
        JSON_UNQUOTE(JSON_EXTRACT(info, '$.surface')) AS surface,
        JSON_UNQUOTE(JSON_EXTRACT(info, '$.breadth')) AS breadth,
        JSON_EXTRACT(info, '$.data_classes') AS data_classes,
-       JSON_UNQUOTE(JSON_EXTRACT(info, '$.auth_source')) AS auth_source
+       JSON_UNQUOTE(JSON_EXTRACT(info, '$.auth_source')) AS auth_source,
+       JSON_UNQUOTE(JSON_EXTRACT(info, '$.api_client_id')) AS api_client_id
 FROM action_logs
 WHERE module = 'PATRON_DISCLOSURE'
   AND action = 'DISCLOSE'
@@ -212,7 +214,8 @@ SELECT action_id,
        JSON_UNQUOTE(JSON_EXTRACT(info, '$.surface')) AS surface,
        JSON_UNQUOTE(JSON_EXTRACT(info, '$.breadth')) AS breadth,
        JSON_EXTRACT(info, '$.data_classes') AS data_classes,
-       JSON_UNQUOTE(JSON_EXTRACT(info, '$.auth_source')) AS auth_source
+       JSON_UNQUOTE(JSON_EXTRACT(info, '$.auth_source')) AS auth_source,
+       JSON_UNQUOTE(JSON_EXTRACT(info, '$.api_client_id')) AS api_client_id
 FROM action_logs
 WHERE module = 'PATRON_DISCLOSURE'
   AND action = 'DISCLOSE'
@@ -261,7 +264,7 @@ A user who can manage system preferences can disable the feature through Koha; t
 - two sequential requests in one persistent worker produce distinct events;
 - a later-registered REST `after_dispatch` hook contributes to the event before the audit finalizer commits it;
 - a forged `x-koha-request-id` never becomes the stored event ID;
-- session, Basic, and OAuth calls to the same covered operation all log equivalent disclosures;
+- session, Basic, and OAuth calls to the same covered operation all log equivalent disclosures; only OAuth records the exact validated API client ID, while the secret and mutable key description remain absent;
 - nested item embeds log every distinct Patron represented plus mapped bare patron-owner IDs, exclude staff provenance IDs, and ignore server-side relationships that were not serialized;
 - redacted Patron output uses the mapped positive unredact set, excludes redaction-created null classes, and includes calculated or embedded fields that remain in the final response;
 - explicit `_per_page = -1`, oversized covered pages, and over-limit nested subject sets fail without truncation or patron disclosure; oversized implicit defaults and core DataTable choices are constrained to the safe ceiling;

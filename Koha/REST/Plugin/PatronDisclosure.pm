@@ -66,11 +66,12 @@ sub register {
 
             my $event = Koha::Patron::Disclosure->new(
                 {
-                    actor_id    => $params->{actor_id},
-                    surface     => $metadata->{surface},
-                    breadth     => Koha::Patron::Disclosure->surface_breadth( $metadata->{surface} ),
-                    auth_source => $params->{auth_source},
-                    interface   => 'api',
+                    actor_id      => $params->{actor_id},
+                    surface       => $metadata->{surface},
+                    breadth       => Koha::Patron::Disclosure->surface_breadth( $metadata->{surface} ),
+                    auth_source   => $params->{auth_source},
+                    api_client_id => $params->{api_client_id},
+                    interface     => 'api',
                 }
             );
             $c->stash(

@@ -139,7 +139,10 @@ sub oauth_access_token {
         }
     )->status_is(200)->json_has('/access_token');
 
-    return $t->tx->res->json->{access_token};
+    return {
+        access_token => $t->tx->res->json->{access_token},
+        client_id    => $api_key->client_id,
+    };
 }
 
 subtest 'authentication sources produce equivalent disclosure events' => sub {
@@ -151,11 +154,13 @@ subtest 'authentication sources produce equivalent disclosure events' => sub {
     my $path   = '/api/v1/patrons/' . $target->id;
     my @expected_classes;
     my @expected_auth_sources;
+    my @expected_api_client_ids;
 
     $t->get_ok( '//' . $actor->userid . ":$password\@$path" => { 'x-koha-request-id' => 'forged-client-event-id' } )
         ->status_is(200);
     @expected_classes = @{ classes_for_patron_representation( $t->tx->res->json ) };
     push @expected_auth_sources, 'basic';
+    push @expected_api_client_ids, undef;
 
     my $session_tx = session_transaction( $actor, GET => $path );
     $t->request_ok($session_tx)->status_is(200);
@@ -165,11 +170,12 @@ subtest 'authentication sources produce equivalent disclosure events' => sub {
         'session response exposes the same data classes'
     );
     push @expected_auth_sources, 'session';
+    push @expected_api_client_ids, undef;
 
     if ( can_load( modules => { 'Net::OAuth2::AuthorizationServer' => undef } ) ) {
-        my $access_token = oauth_access_token($actor);
-        my $oauth_tx     = $t->ua->build_tx( GET => $path );
-        $oauth_tx->req->headers->authorization("Bearer $access_token");
+        my $oauth    = oauth_access_token($actor);
+        my $oauth_tx = $t->ua->build_tx( GET => $path );
+        $oauth_tx->req->headers->authorization( 'Bearer ' . $oauth->{access_token} );
         $t->request_ok($oauth_tx)->status_is(200);
         is_deeply(
             classes_for_patron_representation( $t->tx->res->json ),
@@ -177,6 +183,7 @@ subtest 'authentication sources produce equivalent disclosure events' => sub {
             'OAuth response exposes the same data classes'
         );
         push @expected_auth_sources, 'oauth';
+        push @expected_api_client_ids, $oauth->{client_id};
     } else {
         note 'OAuth request skipped because Net::OAuth2::AuthorizationServer is unavailable';
     }
@@ -189,6 +196,11 @@ subtest 'authentication sources produce equivalent disclosure events' => sub {
         [ map { payload($_)->{auth_source} } @logs ], \@expected_auth_sources,
         'authentication source is recorded'
     );
+    is_deeply(
+        [ map { payload($_)->{api_client_id} } @logs ], \@expected_api_client_ids,
+        'only OAuth responses record the authenticated API client identifier'
+    );
+    ok( !grep( { $_->info =~ /Disclosure audit test/ } @logs ), 'mutable API key descriptions are not copied' );
     is_deeply(
         [ map { payload($_)->{data_classes} } @logs ],
         [ map { [@expected_classes] } @logs ],

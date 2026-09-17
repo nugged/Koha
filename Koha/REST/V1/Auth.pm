@@ -139,6 +139,7 @@ sub authenticate_api_request {
 
     my $user;
     my $auth_source;
+    my $api_client_id;
 
     $c->stash( 'is_public' => 1 )
         if $params->{is_public};
@@ -175,9 +176,11 @@ sub authenticate_api_request {
         );
 
         if ($valid_token) {
-            my $patron_id = Koha::ApiKeys->find( $valid_token->{client_id} )->patron_id;
-            $user        = Koha::Patrons->find($patron_id);
-            $auth_source = 'oauth';
+            my $api_key   = Koha::ApiKeys->find( $valid_token->{client_id} );
+            my $patron_id = $api_key->patron_id;
+            $user          = Koha::Patrons->find($patron_id);
+            $auth_source   = 'oauth';
+            $api_client_id = $api_key->client_id;
         } else {
 
             # If we have "Authorization: Bearer" header and oauth authentication
@@ -294,11 +297,12 @@ sub authenticate_api_request {
         validate_query_parameters( $c, $spec );
         $c->patron_disclosure->initialize(
             {
-                spec        => $spec,
-                actor_id    => $user->id,
-                auth_source => $auth_source,
-                is_public   => $params->{is_public},
-                is_plugin   => $params->{is_plugin},
+                spec          => $spec,
+                actor_id      => $user->id,
+                auth_source   => $auth_source,
+                api_client_id => $api_client_id,
+                is_public     => $params->{is_public},
+                is_plugin     => $params->{is_plugin},
             }
         );
         $c->patron_disclosure->validate_page_size;

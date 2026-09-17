@@ -336,6 +336,70 @@ subtest 'request patron IDs are bounded, canonical, deduplicated, and existence-
     done_testing;
 };
 
+subtest 'OAuth events preserve technical client identity without client metadata' => sub {
+    $schema->storage->txn_begin;
+    t::lib::Mocks::mock_preference( 'StaffPatronDataDisclosureLog',         1 );
+    t::lib::Mocks::mock_preference( 'StaffPatronDataDisclosureMaxSubjects', 1000 );
+
+    my $actor     = $builder->build_object( { class => 'Koha::Patrons' } );
+    my $patron    = $builder->build_object( { class => 'Koha::Patrons' } );
+    my $client_id = '2bd80ec7-e0c2-41d4-b74e-cf4709a46172';
+
+    throws_ok {
+        Koha::Patron::Disclosure->new(
+            {
+                actor_id    => $actor->id,
+                surface     => 'patrons.record.api',
+                breadth     => 'record',
+                auth_source => 'oauth',
+                interface   => 'api',
+            }
+        );
+    }
+    qr/require api_client_id/, 'OAuth events require their validated client identifier';
+
+    throws_ok {
+        Koha::Patron::Disclosure->new(
+            {
+                actor_id      => $actor->id,
+                surface       => 'patrons.record.api',
+                breadth       => 'record',
+                auth_source   => 'session',
+                api_client_id => $client_id,
+                interface     => 'api',
+            }
+        );
+    }
+    qr/only valid for OAuth/, 'session events cannot claim an API client identifier';
+
+    my $event = Koha::Patron::Disclosure->new(
+        {
+            actor_id      => $actor->id,
+            surface       => 'patrons.record.api',
+            breadth       => 'record',
+            auth_source   => 'oauth',
+            api_client_id => $client_id,
+            interface     => 'api',
+        }
+    );
+    $event->add_subject( { patron_id => $patron->id, data_classes => ['identity'] } );
+    my $event_id = $event->commit;
+    like( $event_id, qr/\A[0-9a-f-]{36}\z/i, 'the OAuth event commits normally' );
+
+    my $log     = disclosure_logs()->search( { user => $actor->id } )->single;
+    my $payload = JSON->new->decode( $log->info );
+    is( $payload->{api_client_id}, $client_id, 'the stable technical client identifier is durable' );
+    is_deeply(
+        [ sort keys %{$payload} ],
+        [ sort qw( v event_id surface breadth data_classes auth_source api_client_id ) ],
+        'the OAuth payload adds only the closed client identifier field'
+    );
+    unlike( $log->info, qr/secret|description/i, 'no API secret or mutable client description is stored' );
+
+    $schema->storage->txn_rollback;
+    done_testing;
+};
+
 subtest 'supported non-Patron API references add exact patron subjects' => sub {
     $schema->storage->txn_begin;
     t::lib::Mocks::mock_preference( 'StaffPatronDataDisclosureLog',         1 );
