@@ -109,7 +109,7 @@ subtest 'list() tests' => sub {
     $agreement->delete;
     $another_agreement->delete;
     $agreement_with_another_vendor_id->delete;
-    $t->get_ok(qq~//$userid:$password@/api/v1/erm/agreements?q=[{"me.name":{"like":"%ko%"}}]~)
+    $t->get_ok(qq~//$userid:$password@/api/v1/erm/agreements?q=[{"me.name":{"luke":"%ko%"}}]~)
         ->status_is(200)
         ->json_is( [] );
 
@@ -123,7 +123,7 @@ subtest 'list() tests' => sub {
     );
 
     # Search works, searching for name like 'ko'
-    $t->get_ok(qq~//$userid:$password@/api/v1/erm/agreements?q=[{"me.name":{"like":"%ko%"}}]~)
+    $t->get_ok(qq~//$userid:$password@/api/v1/erm/agreements?q=[{"me.name":{"luke":"%ko%"}}]~)
         ->status_is(200)
         ->json_is( [ $agreement_to_search->to_api ] );
 
