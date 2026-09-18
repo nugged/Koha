@@ -40,7 +40,7 @@ BEGIN {
 
 use HTML::Entities;
 use JSON         qw( encode_json );
-use Scalar::Util qw( looks_like_number );
+use Scalar::Util qw( blessed looks_like_number );
 use URI::Escape;
 
 use C4::Auth qw( get_template_and_user );
@@ -236,14 +236,17 @@ sub output_with_http_headers {
 
     my $patron_disclosure = delete $extra_options->{patron_disclosure};
     if ( $patron_disclosure && $status =~ /\A2[0-9]{2}(?:\s|\z)/ ) {
+        my $audit_error;
         my $ok = eval {
             _commit_patron_disclosure($patron_disclosure);
             1;
         };
+        $audit_error = $@ unless $ok;
 
         unless ($ok) {
             my $surface = ref($patron_disclosure) eq 'HASH' ? $patron_disclosure->{surface} : q{};
             $surface = 'invalid' unless defined $surface && $surface =~ /\A[a-z0-9_.]+\z/;
+            my $reason = _patron_disclosure_failure_reason($audit_error);
             eval {
                 require Koha::Logger;
                 Koha::Logger->get(
@@ -251,7 +254,7 @@ sub output_with_http_headers {
                         interface => 'intranet',
                         category  => 'ActionLogs.PATRON_DISCLOSURE.DISCLOSE',
                     }
-                )->error("Patron disclosure audit failed for surface $surface");
+                )->error("Patron disclosure audit failed for surface $surface (reason=$reason)");
             };
 
             $cookie        = undef;
@@ -311,6 +314,18 @@ sub output_with_http_headers {
 
     $data =~ s/\&amp\;amp\; /\&amp\; /g;
     print $query->header($options), $data;
+}
+
+sub _patron_disclosure_failure_reason {
+    my ($error) = @_;
+
+    return 'invalid_subject_limit'
+        if !ref($error)
+        && defined $error
+        && $error =~ /\AStaffPatronDataDisclosureMaxSubjects must be a positive integer\b/;
+
+    return ref($error) if blessed($error);
+    return 'unclassified';
 }
 
 sub _commit_patron_disclosure {

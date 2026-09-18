@@ -40,7 +40,7 @@ use Koha::Patron::Disclosure;
     sub commit {
         my ($self) = @_;
         $self->{commits}++;
-        die "injected audit failure\n" if $self->{fail};
+        die "StaffPatronDataDisclosureMaxSubjects must be a positive integer\n" if $self->{fail};
         return 'server-event-id';
     }
 }
@@ -303,7 +303,7 @@ subtest 'audit failure emits a fresh PII-free response' => sub {
     is( $events[0]->{commits}, 1, 'the failed event was attempted once' );
     is_deeply(
         $logger->{errors},
-        ['Patron disclosure audit failed for surface patrons.record.details'],
+        ['Patron disclosure audit failed for surface patrons.record.details (reason=invalid_subject_limit)'],
         'the error log contains no actor or subject data'
     );
 };

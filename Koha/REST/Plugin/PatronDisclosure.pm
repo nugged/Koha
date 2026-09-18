@@ -146,8 +146,16 @@ sub register {
                 $subject_limit = Koha::Patron::Disclosure->max_subjects;
                 1;
             };
-            Koha::Exceptions::UnderMaintenance->throw( error => 'Patron disclosure auditing is unavailable' )
-                unless $valid_subject_limit;
+            unless ($valid_subject_limit) {
+                my $surface = $state->{metadata}->{surface};
+                $surface = 'invalid' unless defined $surface && $surface =~ /\A[a-z0-9_.]+\z/;
+                $c->app->log->error(
+                    "Patron disclosure audit failed for surface $surface (reason=invalid_subject_limit)"
+                );
+                Koha::Exceptions::UnderMaintenance->throw(
+                    error => 'Patron disclosure auditing is unavailable'
+                );
+            }
 
             my $available = $subject_limit - $state->{metadata}->{fixed_subjects};
             my $audit_maximum =
