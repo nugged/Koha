@@ -67,11 +67,25 @@ sub new_event {
     );
 }
 
+my ($existing_disclosure_max_action_id) =
+    $schema->storage->dbh->selectrow_array(
+        q{
+            SELECT COALESCE(MAX(action_id), 0)
+            FROM action_logs
+            WHERE module = ?
+              AND action = ?
+        },
+        undef,
+        Koha::Patron::Disclosure::MODULE,
+        Koha::Patron::Disclosure::ACTION,
+    );
+
 sub disclosure_logs {
     return Koha::ActionLogs->search(
         {
-            module => Koha::Patron::Disclosure::MODULE,
-            action => Koha::Patron::Disclosure::ACTION,
+            module    => Koha::Patron::Disclosure::MODULE,
+            action    => Koha::Patron::Disclosure::ACTION,
+            action_id => { '>' => $existing_disclosure_max_action_id },
         },
         { order_by => 'action_id' }
     );
