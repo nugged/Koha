@@ -86,7 +86,9 @@ $logger_mock->redefine( get => sub { return $logger } );
 
 $schema->storage->txn_begin;
 
-t::lib::Mocks::mock_preference( 'SessionStorage',                         'mysql' );
+# This test owns an outer DB transaction; file sessions keep CGI::Session from
+# committing that same handle during session teardown.
+t::lib::Mocks::mock_preference( 'SessionStorage',                         'file' );
 t::lib::Mocks::mock_preference( 'SessionRestrictionByIP',                 0 );
 t::lib::Mocks::mock_preference( 'TwoFactorAuthentication',                'disabled' );
 t::lib::Mocks::mock_preference( 'StaffPatronDataDisclosureMaxSubjects',   1000 );
@@ -216,7 +218,7 @@ $session->param( 'ip',          '127.0.0.1' );
 $session->param( 'sessiontype', 'staff' );
 $session->flush;
 my $csrf_token = Koha::Token->new->generate_csrf( { session_id => $session->id } );
-ok( $csrf_token, 'the DB-backed authenticated session has a CSRF token' );
+ok( $csrf_token, 'the authenticated session has a CSRF token' );
 
 my %test_clients;
 
@@ -543,7 +545,7 @@ subtest 'a covered CGI read fails closed when the real audit write fails' => sub
     is( disclosure_logs()->count, 0, 'the failed audit transaction leaves no partial disclosure row' );
     is_deeply(
         $logger->{error},
-        ['Patron disclosure audit failed for surface patrons.alerts.list'],
+        ['Patron disclosure audit failed for surface patrons.alerts.list (reason=DBIx::Class::Exception)'],
         'the failure log contains the surface but no actor or patron data'
     );
 
