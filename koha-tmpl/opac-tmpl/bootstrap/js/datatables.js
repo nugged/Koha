@@ -149,7 +149,7 @@ function _dt_default_ajax(params) {
 
                             if (criteria != "exact") {
                                 query_term = {
-                                    like:
+                                    luke:
                                         (["contains", "ends_with"].indexOf(
                                             criteria
                                         ) !== -1
@@ -230,8 +230,8 @@ function _dt_default_ajax(params) {
                                 ? [value, built_value]
                                 : value;
                         } else {
-                            let like = {
-                                like:
+                            let luke = {
+                                luke:
                                     (["contains", "ends_with"].indexOf(
                                         criteria
                                     ) !== -1
@@ -245,8 +245,8 @@ function _dt_default_ajax(params) {
                                         : ""),
                             };
                             value_part = built_value
-                                ? [like, built_value]
-                                : like;
+                                ? [luke, built_value]
+                                : luke;
                         }
 
                         part[!attr.includes(".") ? "me." + attr : attr] =

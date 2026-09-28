@@ -493,7 +493,7 @@
 
                         searchpattern += holdnotes ? _("hold notes like ") + holdnotes : "";
 
-                        return holdnotes ? { "-like": "%" + holdnotes + "%" } : "";
+                        return holdnotes ? { "-luke": "%" + holdnotes + "%" } : "";
                     },
                     "me.hold_id": function () {
                         return hold_ids_from_sql.length > 0 ? { "-in": hold_ids_from_sql } : "";

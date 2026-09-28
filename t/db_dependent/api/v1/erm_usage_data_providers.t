@@ -103,7 +103,7 @@ subtest 'list() tests' => sub {
     # Attempt to search by name like 'ko'
     $usage_data_provider->delete;
     $another_usage_data_provider->delete;
-    $t->get_ok(qq~//$userid:$password@/api/v1/erm/usage_data_providers?q=[{"me.name":{"like":"%ko%"}}]~)
+    $t->get_ok(qq~//$userid:$password@/api/v1/erm/usage_data_providers?q=[{"me.name":{"luke":"%ko%"}}]~)
         ->status_is(200)
         ->json_is( [] );
 
@@ -118,7 +118,7 @@ subtest 'list() tests' => sub {
     my $search_udp_result = { %{ $usage_data_provider_to_search->to_api }, %additional_fields };
 
     # Search works, searching for name like 'ko'
-    $t->get_ok(qq~//$userid:$password@/api/v1/erm/usage_data_providers?q=[{"me.name":{"like":"%ko%"}}]~)
+    $t->get_ok(qq~//$userid:$password@/api/v1/erm/usage_data_providers?q=[{"me.name":{"luke":"%ko%"}}]~)
         ->status_is(200)
         ->json_is( [$search_udp_result] );
 
