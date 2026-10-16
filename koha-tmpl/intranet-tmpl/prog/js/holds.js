@@ -71,7 +71,7 @@ function display_pickup_location(state) {
                         params.term === undefined ? "" : params.term;
                     var query = {
                         q: JSON.stringify({
-                            name: { "-like": "%" + search_term + "%" },
+                            name: { "-luke": "%" + search_term + "%" },
                         }),
                         _order_by: "name",
                         _page: params.page,
