@@ -103,7 +103,7 @@ subtest 'list() tests' => sub {
     $ehtitle->delete;
     $another_ehtitle->delete;
     $ehtitle_with_another_publication_type->delete;
-    $t->get_ok(qq~//$userid:$password@/api/v1/erm/eholdings/local/titles?q=[{"me.publication_title":{"like":"%ko%"}}]~)
+    $t->get_ok(qq~//$userid:$password@/api/v1/erm/eholdings/local/titles?q=[{"me.publication_title":{"luke":"%ko%"}}]~)
         ->status_is(200)
         ->json_is( [] );
 
@@ -117,7 +117,7 @@ subtest 'list() tests' => sub {
     );
 
     # Search works, searching for publication_title like 'ko'
-    $t->get_ok(qq~//$userid:$password@/api/v1/erm/eholdings/local/titles?q=[{"me.publication_title":{"like":"%ko%"}}]~)
+    $t->get_ok(qq~//$userid:$password@/api/v1/erm/eholdings/local/titles?q=[{"me.publication_title":{"luke":"%ko%"}}]~)
         ->status_is(200)
         ->json_is( [ $ehtitle_to_search->to_api ] );
 
