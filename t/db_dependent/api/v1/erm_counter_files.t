@@ -86,7 +86,7 @@ subtest 'list() tests' => sub {
     # Attempt to search by type like 'ko'
     $counter_file->delete;
     $another_counter_file->delete;
-    $t->get_ok(qq~//$userid:$password@/api/v1/erm/counter_files?q=[{"me.type":{"like":"%ko%"}}]~)
+    $t->get_ok(qq~//$userid:$password@/api/v1/erm/counter_files?q=[{"me.type":{"luke":"%ko%"}}]~)
         ->status_is(200)
         ->json_is( [] );
 
@@ -100,7 +100,7 @@ subtest 'list() tests' => sub {
     );
 
     # Search works, searching for type like 'ko'
-    $t->get_ok(qq~//$userid:$password@/api/v1/erm/counter_files?q=[{"me.type":{"like":"%ko%"}}]~)
+    $t->get_ok(qq~//$userid:$password@/api/v1/erm/counter_files?q=[{"me.type":{"luke":"%ko%"}}]~)
         ->status_is(200)
         ->json_is( [ $counter_file_to_search->to_api ] );
 
