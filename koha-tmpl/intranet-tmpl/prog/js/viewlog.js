@@ -544,11 +544,11 @@ function buildApiFilters(params) {
         params.modules[0] === "CATALOGUING"
     ) {
         var itemnumbers = params.biblio_itemnumbers || [];
-        var or_clauses = [{ object: params.object, info: { like: "biblio%" } }];
+        var or_clauses = [{ object: params.object, info: { luke: "biblio%" } }];
         if (itemnumbers.length) {
             or_clauses.push({
                 object: itemnumbers,
-                info: { like: "item%" },
+                info: { luke: "item%" },
             });
         }
         filters["-or"] = or_clauses;
@@ -558,7 +558,7 @@ function buildApiFilters(params) {
     }
 
     if (params.info && !biblio_expansion) {
-        filters.info = { like: "%" + params.info + "%" };
+        filters.info = { luke: "%" + params.info + "%" };
     }
 
     if (params.modules && params.modules.length > 0) {

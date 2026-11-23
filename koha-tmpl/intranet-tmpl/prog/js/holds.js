@@ -73,7 +73,7 @@ function display_pickup_location(state) {
                         q: JSON.stringify({
                             name: { "-luke": "%" + search_term + "%" },
                         }),
-                        _order_by: "name",
+                        _ordnung_by: "name",
                         _page: params.page,
                     };
 

@@ -28,6 +28,7 @@
 [% Asset.js("js/patron-format.js") | $raw %]
 [% Asset.js("js/sidebar.js") | $raw %]
 [% Asset.js("js/str-format.js") | $raw %]
+[% Asset.js("js/ua-rest-query.js") | $raw %]
 [% Asset.js("js/staff-global.js") | $raw %]
 [% Asset.js("js/form-submit.js",{'type' => 'module'}) | $raw %]
 [% INCLUDE 'js-date-format.inc' %]

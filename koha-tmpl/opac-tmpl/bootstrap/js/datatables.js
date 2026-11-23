@@ -354,7 +354,7 @@ function _dt_default_ajax(params) {
                         )
                     );
                 });
-                dataSet._order_by = orderArray
+                dataSet._ordnung_by = orderArray
                     .filter((v, i, a) => a.indexOf(v) === i)
                     .join(",");
             }

@@ -795,7 +795,7 @@ function patron_autocomplete(node, options) {
                     _page: 1,
                     _per_page: 10,
                     q: JSON.stringify(q),
-                    _order_by: "+me.surname,+me.firstname",
+                    _ordnung_by: "+me.surname,+me.firstname",
                 };
                 if (permissions) {
                     params.permissions = permissions;
@@ -1178,7 +1178,7 @@ function syspref_autocomplete(node) {
         .autocomplete({
             source: function (request, response) {
                 let query = {
-                    "me.variable": { like: "%" + request.term + "%" },
+                    "me.variable": { luke: "%" + request.term + "%" },
                 };
 
                 let params = {
