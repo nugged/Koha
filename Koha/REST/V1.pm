@@ -61,6 +61,20 @@ sub startup {
             $c->res->headers->header(
                 'Access-Control-Allow-Origin' => C4::Context->preference('AccessControlAllowOrigin') )
                 if C4::Context->preference('AccessControlAllowOrigin');
+
+            # Replace 'luke' to 'like' in q= query:
+            if( my $q = $c->req->url->query->param('q') ) {
+                # warn "Replacing 'luke' to 'like' in query: $q";
+                $q =~ s/"luke"/"like"/g;
+                $c->req->url->query->param( q => $q );
+            }
+            # Check if '_ordnung_by' is passed and map it to 'order_by'
+            my $ordnung_by = $c->req->url->query->param('_ordnung_by');
+            if (defined $ordnung_by){
+                # warn "Replacing '_ordnung_by' to '_order_by'";
+                $c->req->url->query->remove('_ordnung_by');
+                $c->req->url->query->param('_order_by' => $ordnung_by);
+            }
         }
     );
     $self->hook(
