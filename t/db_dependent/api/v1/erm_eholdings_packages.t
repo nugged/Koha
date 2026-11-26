@@ -111,7 +111,7 @@ subtest 'list() tests' => sub {
     $ehpackage->delete;
     $another_ehpackage->delete;
     $ehpackage_with_another_package_type->delete;
-    $t->get_ok(qq~//$userid:$password@/api/v1/erm/eholdings/local/packages?q=[{"me.name":{"like":"%ko%"}}]~)
+    $t->get_ok(qq~//$userid:$password@/api/v1/erm/eholdings/local/packages?q=[{"me.name":{"luke":"%ko%"}}]~)
         ->status_is(200)
         ->json_is( [] );
 
@@ -126,7 +126,7 @@ subtest 'list() tests' => sub {
     );
 
     # Search works, searching for name like 'ko'
-    $t->get_ok(qq~//$userid:$password@/api/v1/erm/eholdings/local/packages?q=[{"me.name":{"like":"%ko%"}}]~)
+    $t->get_ok(qq~//$userid:$password@/api/v1/erm/eholdings/local/packages?q=[{"me.name":{"luke":"%ko%"}}]~)
         ->status_is(200)
         ->json_is( [ $ehpackage_to_search->to_api ] );
 
