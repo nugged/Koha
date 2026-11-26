@@ -742,7 +742,7 @@ subtest '/merge_q_params' => sub {
                 "-or"       => [
                     { "creation_date" => { "!=" => [ "2024-01-01", "2024-06-15", "2025-01-01" ] } },
                     { "suggestions.suggester.housebound_profile.frequency" => "123" },
-                    { "suggestions.suggester.library_id"                   => { "like" => "%CPL%" } }
+                    { "suggestions.suggester.library_id"                   => { "luke" => "%CPL%" } }
                 ]
             }
         }
@@ -761,7 +761,7 @@ subtest '/merge_q_params' => sub {
                         }
                     },
                     { "housebound_profile.frequency" => 123 },
-                    { "suggester.branchcode"         => { "like" => "\%CPL\%" } }
+                    { "suggester.branchcode"         => { "luke" => "\%CPL\%" } }
                 ]
             },
             { "biblio_id" => 1 }

@@ -46,7 +46,12 @@ class HttpClient {
     ) {
         let res, error;
         if (mark_submitting) submitting();
-        await fetch(this._baseURL + endpoint, {
+        const endpointUrl = this._baseURL + endpoint;
+        const requestUrl =
+            options.method === "GET" && globalThis.kohaUaApiGetUrl
+                ? globalThis.kohaUaApiGetUrl(endpointUrl)
+                : endpointUrl;
+        await fetch(requestUrl, {
             ...options,
             ...(config.signal ? { signal: config.signal } : {}),
             headers: { ...this._headers, ...headers },

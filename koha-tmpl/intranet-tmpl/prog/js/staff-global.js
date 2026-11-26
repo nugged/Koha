@@ -795,7 +795,7 @@ function patron_autocomplete(node, options) {
                     _page: 1,
                     _per_page: 10,
                     q: JSON.stringify(q),
-                    _order_by: "+me.surname,+me.firstname",
+                    _ordnung_by: "+me.surname,+me.firstname",
                 };
                 if (permissions) {
                     params.permissions = permissions;
@@ -998,7 +998,7 @@ function buildPatronSearchQuery(term, options) {
         search_fields.forEach(function (field, i) {
             pattern_subquery_or.push({
                 [table_prefix + "." + field]: {
-                    like: leading_wildcard + pattern + "%",
+                    luke: leading_wildcard + pattern + "%",
                 },
             });
             if (field == "dateofbirth") {
@@ -1021,7 +1021,7 @@ function buildPatronSearchQuery(term, options) {
     search_fields.forEach(function (field, i) {
         term_subquery_or.push({
             [table_prefix + "." + field]: {
-                like: leading_wildcard + term + "%",
+                luke: leading_wildcard + term + "%",
             },
         });
     });
@@ -1045,7 +1045,7 @@ function buildPatronSearchQuery(term, options) {
             let extended_attribute_sub_or = [];
             extended_attribute_sub_or.push({
                 "extended_attributes.value": {
-                    like: leading_wildcard + pattern + "%",
+                    luke: leading_wildcard + pattern + "%",
                 },
                 "extended_attributes.code": extended_attribute_codes_to_search,
             });
@@ -1178,7 +1178,7 @@ function syspref_autocomplete(node) {
         .autocomplete({
             source: function (request, response) {
                 let query = {
-                    "me.variable": { like: "%" + request.term + "%" },
+                    "me.variable": { luke: "%" + request.term + "%" },
                 };
 
                 let params = {

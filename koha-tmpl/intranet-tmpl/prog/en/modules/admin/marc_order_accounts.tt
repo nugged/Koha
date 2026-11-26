@@ -306,8 +306,8 @@
                     data: function (params) {
                         var search_term = params.term === undefined ? "" : params.term;
                         var query = {
-                            q: JSON.stringify({ name: { "-like": "%" + search_term + "%" } }),
-                            _order_by: "name",
+                            q: JSON.stringify({ name: { "-luke": "%" + search_term + "%" } }),
+                            _ordnung_by: "name",
                             _page: params.page,
                         };
 

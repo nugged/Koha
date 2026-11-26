@@ -27,7 +27,7 @@ use Mojolicious::Plugin::OAuth2;
 use JSON::Validator::Schema::OpenAPIv2;
 
 use Try::Tiny qw( catch try );
-use JSON      qw( encode_json decode_json );
+use JSON      qw( decode_json encode_json from_json to_json );
 use XML::LibXML;
 
 =head1 NAME
@@ -61,6 +61,8 @@ sub startup {
             $c->res->headers->header(
                 'Access-Control-Allow-Origin' => C4::Context->preference('AccessControlAllowOrigin') )
                 if C4::Context->preference('AccessControlAllowOrigin');
+
+            _normalize_query_aliases( $c->req->url->query );
         }
     );
     $self->hook(
@@ -224,6 +226,66 @@ sub startup {
     $self->plugin('Koha::REST::Plugin::Auth::IdP');
     $self->plugin('Koha::REST::Plugin::Auth::PublicRoutes');
     $self->plugin( 'OAuth2' => $oauth_configuration );
+}
+
+sub _normalize_query_aliases {
+    my ($params) = @_;
+
+    for my $suffix ( '', '[]' ) {
+        my $alias = '_ordnung_by' . $suffix;
+        my $order = '_order_by' . $suffix;
+        my $values = $params->every_param($alias);
+        next unless @$values;
+
+        $params->remove($alias);
+        $params->param( $order => $values ) unless @{ $params->every_param($order) };
+    }
+
+    my $filters = $params->every_param('q');
+    my $changed;
+    for my $filter (@$filters) {
+        next unless $filter =~ /"-?luke"\s*:/;
+
+        my $normalized = try {
+            my $query = from_json($filter);
+            _rename_filter_aliases($query) ? to_json($query) : undef;
+        };
+        next unless defined $normalized;
+
+        $filter  = $normalized;
+        $changed = 1;
+    }
+
+    $params->param( q => $filters ) if $changed;
+}
+
+# Decode operator keys only. Keep scalar search terms and invalid filters intact
+# for the usual Koha API query validation.
+sub _rename_filter_aliases {
+    my ($node) = @_;
+    my $changed;
+
+    if ( ref($node) eq 'ARRAY' ) {
+        for my $child (@$node) {
+            $changed = 1 if _rename_filter_aliases($child);
+        }
+    } elsif ( ref($node) eq 'HASH' ) {
+        for my $alias ( 'luke', '-luke' ) {
+            next unless exists $node->{$alias};
+
+            ( my $operator = $alias ) =~ s/luke$/like/;
+            die "Conflicting filter operators" if exists $node->{$operator};
+
+            $node->{$operator} = delete $node->{$alias};
+            $changed = 1;
+        }
+
+        for my $child ( values %$node ) {
+            $changed = 1 if _rename_filter_aliases($child);
+        }
+    }
+
+    return $changed;
 }
 
 =head3 _route_wants_raw_payload
