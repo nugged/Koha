@@ -108,7 +108,7 @@ export default {
                 const client = APIClient.erm;
                 const attribute = "me." + props.label;
                 const q = {};
-                q[attribute] = { like: `%${e}%` };
+                q[attribute] = { luke: `%${e}%` };
                 await client[props.dataType]
                     .getAll(q, {
                         _per_page: -1,

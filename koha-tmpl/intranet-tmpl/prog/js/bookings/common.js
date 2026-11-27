@@ -1,5 +1,19 @@
 /* global __ escape_str $date */
 
+// The timeline's complete-collection helper sends its requests directly.
+if (window.kohaUaApiGetUrl && typeof window.fetchAllKohaApiPages === "function") {
+    const fetchAllPages = window.fetchAllKohaApiPages;
+    window.fetchAllKohaApiPages = (
+        endpoint,
+        resource,
+        headers,
+        fetchPage = fetch
+    ) =>
+        fetchAllPages(endpoint, resource, headers, (url, options) =>
+            fetchPage(window.kohaUaApiGetUrl(url), options)
+        );
+}
+
 /**
  * Shared rendering helpers for the patron and biblio bookings tables,
  * keeping the actions and display consistent across the two displays.

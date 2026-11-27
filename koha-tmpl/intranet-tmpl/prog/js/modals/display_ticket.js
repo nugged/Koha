@@ -150,7 +150,7 @@ $(document).ready(function () {
                     let query = {
                         q: JSON.stringify(q),
                         _page: params.page,
-                        _order_by: "+me.surname,+me.firstname",
+                        _ordnung_by: "+me.surname,+me.firstname",
                     };
                     return query;
                 },
